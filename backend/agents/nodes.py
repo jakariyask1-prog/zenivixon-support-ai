@@ -7,7 +7,7 @@ from core.tools import get_customer, get_order, get_invoice, get_subscription
 from core.zendesk import escalate_to_human
 from core.qdrant_store import search_kb
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+llm = ChatGoogleGenerativeAI(model="gemini-3.6-flash", temperature=0)
 
 def intake_node(state: TicketState) -> dict:
     """Analyze intent, urgency, and sentiment."""
