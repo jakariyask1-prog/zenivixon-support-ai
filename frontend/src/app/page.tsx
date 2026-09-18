@@ -277,8 +277,12 @@ export default function App() {
 
   const handleVerifyPasscode = (e: React.FormEvent) => {
     e.preventDefault();
-    // Accept 'zenivixon', 'zenivixon2026', or 'admin'
-    const validCodes = ['zenivixon', 'zenivixon2026', 'admin'];
+    const validCodes = [
+      'zenivixon admin pannel',
+      'zenivixon admin panel',
+      'zenivixon',
+      'zenivixon2026'
+    ];
     if (validCodes.includes(passcodeInput.trim().toLowerCase()) || passcodeInput.trim() === '') {
       setIsTeamAuthenticated(true);
       setShowPasscodeModal(false);
@@ -1211,14 +1215,15 @@ export default function App() {
                   autoFocus
                   value={passcodeInput}
                   onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(false); }}
-                  placeholder="Enter passcode (e.g. zenivixon)"
+                  placeholder="Enter passcode"
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 {passcodeError && (
                   <p className="text-xs text-rose-400 mt-1.5 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" /> Incorrect passcode. Try &ldquo;zenivixon&rdquo;
+                    <AlertCircle className="w-3.5 h-3.5" /> Incorrect passcode. Please enter the valid team passcode.
                   </p>
                 )}
+
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
