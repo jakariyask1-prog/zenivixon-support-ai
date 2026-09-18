@@ -23,9 +23,13 @@ def intake_node(state: TicketState) -> dict:
     """
     
     response = llm.invoke([HumanMessage(content=prompt)])
-    # Simplified parsing for demo
+    raw_content = response.content
+    if isinstance(raw_content, list):
+        raw_content = " ".join([i.get("text", "") for i in raw_content if isinstance(i, dict) and "text" in i])
+    else:
+        raw_content = str(raw_content)
     try:
-        content = response.content.strip().replace("```json", "").replace("```", "")
+        content = raw_content.strip().replace("```json", "").replace("```", "")
         data = json.loads(content)
     except:
         data = {"category": "General", "intent": "Unknown", "priority": "Medium", "sentiment": "Neutral"}
@@ -81,7 +85,11 @@ def resolution_engine_node(state: TicketState) -> dict:
     """
     
     response = llm.invoke([HumanMessage(content=prompt)])
-    draft = response.content
+    raw_draft = response.content
+    if isinstance(raw_draft, list):
+        draft = " ".join([i.get("text", "") for i in raw_draft if isinstance(i, dict) and "text" in i])
+    else:
+        draft = str(raw_draft)
     findings = "Analyzed KB and system data to draft response."
     
     return {
