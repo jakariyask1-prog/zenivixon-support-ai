@@ -34,10 +34,10 @@ def search_kb(query: str, limit: int = 3):
     query_vector = embeddings.embed_query(query)
     
     client = get_qdrant_client()
-    results = client.search(
+    results = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
+        query=query_vector,
         limit=limit
     )
     
-    return [{"text": hit.payload.get("text"), "source": hit.payload.get("source"), "score": hit.score} for hit in results]
+    return [{"text": hit.payload.get("text"), "source": hit.payload.get("source"), "score": hit.score} for hit in results.points]
