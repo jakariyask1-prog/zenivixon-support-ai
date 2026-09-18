@@ -18,9 +18,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.get("/health")
+def health_check():
+    """Healthcheck endpoint for Render and external uptime monitoring."""
+    return {
+        "status": "online",
+        "service": "ZENIVIXON Support AI",
+        "version": "1.0.0",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 Base.metadata.create_all(bind=engine)
 
 class TicketRequest(BaseModel):
+
     email: str
     message: str
 
