@@ -14,7 +14,7 @@ export default function Dashboard() {
   // Fetch Stats
   const fetchStats = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/dashboard/stats');
+      const res = await fetch('https://zenivixon-backend.onrender.com/api/dashboard/stats');
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -33,7 +33,7 @@ export default function Dashboard() {
     if (e) e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/tickets', {
+      const res = await fetch('https://zenivixon-backend.onrender.com/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
