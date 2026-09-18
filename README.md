@@ -8,7 +8,7 @@ The system pairs a multi-agent backend orchestration layer (LangGraph + Gemini +
 
 - **Multi-agent orchestration with LangGraph** — A robust stateful graph that processes tickets through sequential stages: intake, verification, tool execution, resolution, and final safety guardrails before deciding to automatically resolve or escalate to a human.
 - **Modern Infrastructure** — Fully containerized backing services using Docker Compose, including PostgreSQL (relational data), Qdrant (vector search for RAG), and Redis.
-- **Grounded AI** — RAG agent powered by Google Gemini and `models/text-embedding-004`, ensuring responses are grounded in your actual knowledge base.
+- **Grounded AI** — RAG agent powered by Google Gemini (`gemini-3.6-flash`) and `models/gemini-embedding-001` (3072-dim vectors), ensuring responses are grounded in the 30-chunk ZENIVIXON Master Knowledge Base.
 
 ## Architecture
 
@@ -35,24 +35,30 @@ The system pairs a multi-agent backend orchestration layer (LangGraph + Gemini +
                                      │
                           ┌──────────▼──────────┐
                           │       safety        │
-                          └──────────┬──────────┘
-                                     │
-              ┌──────────────────────┴───────────────────────┐
-        [is_safe: true]                                [is_safe: false]
-              ▼                                              ▼
-       ┌─────────────┐                                ┌────────────┐
-       │   resolve   │                                │ escalation │
-       └──────┬──────┘                                └──────┬─────┘
-              │                                              │
-              └──────────────────────┬───────────────────────┘
-                                     ▼
-                                    END
+```
+User / Customer
+      │
+      ▼
+Next.js Operations Console (Port 3000)
+      │
+      ▼
+FastAPI Backend (Port 8000)
+      │
+      ▼
+LangGraph Autonomous Agent Pipeline
+  ├── 1. Intake & Classification (LLM: Gemini 3.6 Flash)
+  ├── 2. Customer ID Verification (PostgreSQL / Neon)
+  ├── 3. Tools & Knowledge Retrieval (Qdrant Vector Store: 30 Master Chunks)
+  ├── 4. Grounded Resolution Engine (Gemini 3.6 Flash)
+  ├── 5. Safety Gate & Policy Verification
+  └── 6. Output Route: Auto-Resolve OR Human Escalation (Zendesk Mock/Live)
 ```
 
 **Tech Stack:**
-- **Backend:** FastAPI + SQLAlchemy, LangGraph, Gemini API (`models/text-embedding-004`)
-- **Infrastructure:** Docker Compose (PostgreSQL `zenivixon_db`, Qdrant, Redis)
-- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4
+- **Backend:** FastAPI + SQLAlchemy, LangGraph, Google GenAI SDK (`gemini-3.6-flash`, `models/gemini-embedding-001`)
+- **Vector DB:** Qdrant Cloud (`zenivixon_kb` collection with 3072-dim cosine vectors)
+- **Database:** Neon PostgreSQL (`zenivixon_db` relational ledger)
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Lucide Icons
 
 ---
 

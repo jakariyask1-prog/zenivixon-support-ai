@@ -39,6 +39,24 @@ def get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
         return {"amount": invoice.amount, "status": invoice.status, "due_date": invoice.due_date.isoformat() if invoice.due_date else None}
     return None
 
+def get_latest_customer_order(customer_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieve the most recent order for a customer."""
+    db = SessionLocal()
+    order = db.query(Order).filter(Order.customer_id == customer_id).order_by(Order.created_at.desc()).first()
+    db.close()
+    if order:
+        return {"order_id": order.id, "status": order.status, "total_amount": order.total_amount, "created_at": order.created_at.isoformat()}
+    return None
+
+def get_latest_customer_invoice(customer_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieve the most recent invoice for a customer."""
+    db = SessionLocal()
+    invoice = db.query(Invoice).filter(Invoice.customer_id == customer_id).order_by(Invoice.due_date.desc()).first()
+    db.close()
+    if invoice:
+        return {"invoice_id": invoice.id, "amount": invoice.amount, "status": invoice.status, "due_date": invoice.due_date.isoformat() if invoice.due_date else None}
+    return None
+
 def check_service_status() -> Dict[str, Any]:
     """Check the operational status of internal services."""
     # Mocking a normal state, but could be modified to simulate outages.

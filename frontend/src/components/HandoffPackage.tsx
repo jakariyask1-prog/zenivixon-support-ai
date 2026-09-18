@@ -1,7 +1,31 @@
 import React from 'react';
-import { User, AlertCircle, Bot, Activity, ArrowRight, CheckCircle2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { User, AlertCircle, Bot, Activity, CheckCircle2, AlertTriangle, MessageSquare } from 'lucide-react';
 
-export default function HandoffPackage({ ticket }: { ticket: any }) {
+export interface HandoffCustomer {
+  email: string;
+  isVerified: boolean;
+  tier: string;
+}
+
+export interface ToolExecutionItem {
+  name?: string;
+  tool?: string;
+  result?: string;
+  data?: string;
+}
+
+export interface HandoffTicket {
+  customer: HandoffCustomer;
+  rawMessage: string;
+  category: string;
+  intent: string;
+  priority: string;
+  aiFindings: string;
+  toolsExecuted: ToolExecutionItem[];
+  escalationReason: string;
+}
+
+export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | null }) {
   if (!ticket) return null;
 
   return (
@@ -53,7 +77,7 @@ export default function HandoffPackage({ ticket }: { ticket: any }) {
                 <span className="text-xs text-amber-600/70 font-medium">{ticket.intent}</span>
               </div>
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
-                "{ticket.rawMessage}"
+                &ldquo;{ticket.rawMessage}&rdquo;
               </p>
             </div>
           </div>
@@ -76,14 +100,19 @@ export default function HandoffPackage({ ticket }: { ticket: any }) {
                 <Activity className="w-4 h-4" /> Tools Executed
               </h4>
               <ul className="space-y-2">
-                {ticket.toolsExecuted.map((tool: any, idx: number) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                    <span className="text-slate-600 dark:text-slate-400 font-mono text-xs">{tool.name}()<br/>
-                    <span className="text-slate-900 dark:text-slate-200 font-sans mt-0.5 block">{tool.result}</span>
-                    </span>
-                  </li>
-                ))}
+                {ticket.toolsExecuted.map((tool, idx) => {
+                  const toolName = tool.name || tool.tool || 'tool';
+                  const toolResult = tool.result || tool.data || 'Completed';
+                  return (
+                    <li key={idx} className="flex items-start gap-2 text-sm bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                      <span className="text-slate-600 dark:text-slate-400 font-mono text-xs">
+                        {toolName}()<br />
+                        <span className="text-slate-900 dark:text-slate-200 font-sans mt-0.5 block">{toolResult}</span>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             
@@ -110,3 +139,4 @@ export default function HandoffPackage({ ticket }: { ticket: any }) {
     </div>
   );
 }
+
