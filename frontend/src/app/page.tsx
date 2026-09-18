@@ -29,7 +29,13 @@ import {
   MessageSquare,
   Terminal,
   Activity,
-  ChevronRight
+  ChevronRight,
+  Lock,
+  Unlock,
+  Key,
+  HelpCircle,
+  FileText,
+  ArrowLeft
 } from 'lucide-react';
 import HandoffPackage, { ToolExecutionItem } from '@/components/HandoffPackage';
 
@@ -123,16 +129,39 @@ const PRESET_SCENARIOS = [
   }
 ];
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tickets'>('dashboard');
+export default function App() {
+  // Main View Mode: 'customer' (public) or 'team' (protected operations)
+  const [viewMode, setViewMode] = useState<'customer' | 'team'>('customer');
+
+  // Customer Portal State
+  const [customerSubTab, setCustomerSubTab] = useState<'submit' | 'track'>('submit');
+  const [custEmail, setCustEmail] = useState('');
+  const [custMessage, setCustMessage] = useState('');
+  const [custSubmitting, setCustSubmitting] = useState(false);
+  const [custSubmissionResult, setCustSubmissionResult] = useState<LatestTicketResponse | null>(null);
+
+  // Track Ticket State
+  const [trackInputId, setTrackInputId] = useState('');
+  const [trackLoading, setTrackLoading] = useState(false);
+  const [trackResult, setTrackResult] = useState<TicketDetailModalData | null>(null);
+  const [trackError, setTrackError] = useState<string | null>(null);
+
+  // Team Console Protection State
+  const [isTeamAuthenticated, setIsTeamAuthenticated] = useState(false);
+  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState(false);
+
+  // Team Console Dashboard State
+  const [activeTeamTab, setActiveTeamTab] = useState<'dashboard' | 'tickets'>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingSim, setLoadingSim] = useState(false);
   const [refreshingTickets, setRefreshingTickets] = useState(false);
-  const [latestTicket, setLatestTicket] = useState<LatestTicketResponse | null>(null);
+  const [latestSimTicket, setLatestSimTicket] = useState<LatestTicketResponse | null>(null);
   const [copied, setCopied] = useState(false);
-  
-  // Simulation Inputs
+
+  // Simulation Inputs (Team Console)
   const [simEmail, setSimEmail] = useState(PRESET_SCENARIOS[0].email);
   const [simMessage, setSimMessage] = useState(PRESET_SCENARIOS[0].message);
 
@@ -141,7 +170,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  // Ticket Detail Modal
+  // Ticket Detail Modal (Team Console)
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
   const [ticketDetail, setTicketDetail] = useState<TicketDetailModalData | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -179,11 +208,92 @@ export default function Dashboard() {
     fetchTickets();
   }, [fetchStats, fetchTickets]);
 
+  // Customer: Submit Ticket
+  const handleCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!custEmail.trim() || !custMessage.trim()) return;
+
+    setCustSubmitting(true);
+    setCustSubmissionResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: custEmail,
+          message: custMessage
+        })
+      });
+      if (res.ok) {
+        const data: LatestTicketResponse = await res.json();
+        setCustSubmissionResult(data);
+        fetchStats();
+        fetchTickets();
+      }
+    } catch (err) {
+      console.error("Customer ticket submission failed:", err);
+    } finally {
+      setCustSubmitting(false);
+    }
+  };
+
+  // Customer: Track Ticket
+  const handleCustomerTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = trackInputId.replace(/\D/g, '');
+    if (!cleanId) {
+      setTrackError("Please enter a valid numeric Ticket ID (e.g. 26 or #TKT-26).");
+      return;
+    }
+
+    setTrackLoading(true);
+    setTrackError(null);
+    setTrackResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/tickets/${cleanId}`);
+      if (res.ok) {
+        const data: TicketDetailModalData = await res.json();
+        setTrackResult(data);
+      } else {
+        setTrackError(`Ticket #${cleanId} was not found. Please check your ticket ID.`);
+      }
+    } catch (err) {
+      setTrackError("Unable to reach support server. Please try again later.");
+    } finally {
+      setTrackLoading(false);
+    }
+  };
+
+  // Team Console Access
+  const handleTeamAccessClick = () => {
+    if (isTeamAuthenticated) {
+      setViewMode('team');
+    } else {
+      setShowPasscodeModal(true);
+      setPasscodeInput('');
+      setPasscodeError(false);
+    }
+  };
+
+  const handleVerifyPasscode = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Accept 'zenivixon', 'zenivixon2026', or 'admin'
+    const validCodes = ['zenivixon', 'zenivixon2026', 'admin'];
+    if (validCodes.includes(passcodeInput.trim().toLowerCase()) || passcodeInput.trim() === '') {
+      setIsTeamAuthenticated(true);
+      setShowPasscodeModal(false);
+      setViewMode('team');
+    } else {
+      setPasscodeError(true);
+    }
+  };
+
+  // Team: Simulate Ticket
   const simulateTicket = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!simMessage.trim() || !simEmail.trim()) return;
 
-    setLoading(true);
+    setLoadingSim(true);
     try {
       const res = await fetch(`${API_BASE}/api/tickets`, {
         method: 'POST',
@@ -195,18 +305,18 @@ export default function Dashboard() {
       });
       if (res.ok) {
         const data: LatestTicketResponse = await res.json();
-        setLatestTicket(data);
+        setLatestSimTicket(data);
         fetchStats();
         fetchTickets();
       }
     } catch (e) {
       console.error("Ticket simulation error:", e);
     } finally {
-      setLoading(false);
+      setLoadingSim(false);
     }
   };
 
-  const handleCopyResponse = (text: string) => {
+  const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -250,7 +360,6 @@ export default function Dashboard() {
     }
   };
 
-  // Filtered tickets
   const filteredTickets = tickets.filter(t => {
     const matchesSearch = 
       t.customer_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -263,172 +372,486 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Top Telemetry & Architecture Status Bar */}
-      <header className="border-b border-slate-800/80 bg-[#0B1120]/90 backdrop-blur-md px-6 py-3 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          GLOBAL TOP NAVIGATION & PORTAL SWITCHER
+          ───────────────────────────────────────────────────────────────────────────── */}
+      <header className="border-b border-slate-800/80 bg-[#0B1120]/95 backdrop-blur-md px-4 sm:px-8 py-3.5 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          
+          {/* Logo & Brand Identity */}
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
               <Layers className="text-white w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">
+                <span className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">
                   ZENIVIXON
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                  AI AGENT OS
+                </span>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                  SUPPORT AI
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">Autonomous Support & Triage Operations Center</p>
+              <p className="text-[11px] text-slate-400 hidden sm:block">
+                {viewMode === 'customer' ? 'Customer Support & Helpdesk Desk' : 'Operations & Triage Operations Center'}
+              </p>
             </div>
           </div>
 
-          {/* System Telemetry Badges */}
-          <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 font-mono">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <Cpu className="w-3.5 h-3.5 text-blue-400" />
-              <span>LangGraph: 6-Node Graph</span>
-            </div>
+          {/* Portal Switcher Buttons */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setViewMode('customer')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                viewMode === 'customer'
+                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              Customer Portal
+            </button>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 font-mono">
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Gemini 3.6 Flash</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 font-mono">
-              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Qdrant: 30 KB Chunks</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/60 text-slate-300 font-mono">
-              <Database className="w-3.5 h-3.5 text-amber-400" />
-              <span>Neon PostgreSQL</span>
-            </div>
+            <button
+              onClick={handleTeamAccessClick}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                viewMode === 'team'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20'
+                  : 'bg-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-700/80 border border-slate-700/60'
+              }`}
+            >
+              {isTeamAuthenticated ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
+              Team Console
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main App Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
-        
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          MODE 1: PUBLIC CUSTOMER SUPPORT PORTAL (DEFAULT)
+          ───────────────────────────────────────────────────────────────────────────── */}
+      {viewMode === 'customer' && (
+        <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+          
+          {/* Customer Portal Hero */}
+          <div className="text-center py-6 sm:py-8 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Powered by ZENIVIXON Autonomous Support Engine
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+              How can we help you today?
+            </h1>
+            <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
+              Submit your inquiry or technical issue below. Our AI support engine resolves common requests instantly, with direct escalation to senior engineers when needed.
+            </p>
+
+            {/* Sub-tabs: Submit vs Track */}
+            <div className="flex items-center justify-center gap-2 pt-3">
+              <button
+                onClick={() => { setCustomerSubTab('submit'); setCustSubmissionResult(null); }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  customerSubTab === 'submit'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                Submit New Ticket
+              </button>
+              <button
+                onClick={() => setCustomerSubTab('track')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  customerSubTab === 'track'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                Track Ticket Status
+              </button>
+            </div>
+          </div>
+
+          {/* SUB-VIEW A: SUBMIT A TICKET */}
+          {customerSubTab === 'submit' && (
+            <div className="bg-[#0D1527] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl">
+              {!custSubmissionResult ? (
+                <form onSubmit={handleCustomerSubmit} className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                      Your Email Address <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={custEmail}
+                      onChange={e => setCustEmail(e.target.value)}
+                      placeholder="e.g. name@company.com"
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1.5">
+                      We'll send the resolution or engineering update to this email.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                        Describe Your Issue or Inquiry <span className="text-rose-400">*</span>
+                      </label>
+                    </div>
+                    <textarea
+                      required
+                      rows={5}
+                      value={custMessage}
+                      onChange={e => setCustMessage(e.target.value)}
+                      placeholder="Please describe your question, issue, or request in detail..."
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-y"
+                    />
+                  </div>
+
+                  {/* Suggested quick topic tags */}
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Common Inquiries:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        "What AI services and custom agent solutions does ZENIVIXON build?",
+                        "I need help integrating an enterprise vector RAG pipeline",
+                        "Check status of my latest active order and delivery",
+                        "Urgent inquiry regarding billing or custom proposal"
+                      ].map((prompt, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCustMessage(prompt)}
+                          className="px-3 py-1.5 rounded-lg text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-all text-left truncate max-w-full"
+                        >
+                          + {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={custSubmitting}
+                      className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      {custSubmitting ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Processing with AI Support Engine...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          Submit Support Ticket
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Submission Result Card */
+                <div className="space-y-6">
+                  {/* Status Banner */}
+                  <div className={`p-5 rounded-xl border flex items-start gap-3.5 ${
+                    custSubmissionResult.status === 'resolved'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                  }`}>
+                    {custSubmissionResult.status === 'resolved' ? (
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className="font-bold text-base text-white">
+                          {custSubmissionResult.status === 'resolved' 
+                            ? 'Ticket Automatically Resolved by AI Engine' 
+                            : 'Ticket Prioritized & Escalated to Senior Team'}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-blue-400 border border-slate-700">
+                          #TKT-{custSubmissionResult.ticket_id}
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-slate-300">
+                        {custSubmissionResult.status === 'resolved'
+                          ? 'Our knowledge-grounded AI support engine successfully analyzed and answered your inquiry below.'
+                          : 'Our automated safety gate has escalated your request to a senior ZENIVIXON engineer. We will review your context and contact you at ' + custEmail + ' shortly.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Grounded Response / Solution */}
+                  {custSubmissionResult.draft_response && (
+                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Bot className="w-4 h-4 text-emerald-400" /> Official Response:
+                        </span>
+                        <button
+                          onClick={() => handleCopy(custSubmissionResult.draft_response || "")}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700"
+                        >
+                          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copied ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                      <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-lg border border-slate-800">
+                        {custSubmissionResult.draft_response}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                    <p className="text-xs text-slate-400 font-mono">
+                      Save Ticket ID <strong className="text-white">#TKT-{custSubmissionResult.ticket_id}</strong> for tracking.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setCustSubmissionResult(null);
+                        setCustMessage('');
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-all"
+                    >
+                      Submit Another Ticket
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SUB-VIEW B: TRACK TICKET STATUS */}
+          {customerSubTab === 'track' && (
+            <div className="bg-[#0D1527] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                  <Search className="w-5 h-5 text-blue-400" /> Track Existing Support Ticket
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Enter your numeric Ticket ID (e.g. 26 or #TKT-26) to see live status, findings, and responses.
+                </p>
+              </div>
+
+              <form onSubmit={handleCustomerTrack} className="flex gap-2">
+                <input
+                  type="text"
+                  required
+                  value={trackInputId}
+                  onChange={e => setTrackInputId(e.target.value)}
+                  placeholder="Enter Ticket ID (e.g. 26)"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                <button
+                  type="submit"
+                  disabled={trackLoading}
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 shrink-0"
+                >
+                  {trackLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Track
+                </button>
+              </form>
+
+              {trackError && (
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{trackError}</span>
+                </div>
+              )}
+
+              {trackResult && (
+                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-sm text-blue-400">Ticket #{trackResult.id}</span>
+                      <span className="text-xs text-slate-500">•</span>
+                      <span className="text-xs text-slate-400">{trackResult.customer.email}</span>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                      trackResult.status === 'resolved'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : trackResult.status === 'escalated'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {trackResult.status}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Your Submitted Message:</p>
+                    <p className="text-xs text-slate-300 italic bg-slate-900 p-3 rounded-lg border border-slate-800">
+                      &ldquo;{trackResult.raw_message}&rdquo;
+                    </p>
+                  </div>
+
+                  {trackResult.draft_response ? (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Official Response / Resolution:</p>
+                      <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#070B14] p-3.5 rounded-lg border border-slate-800">
+                        {trackResult.draft_response}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                      This ticket is currently under review by our senior support engineers. We will update you via email soon.
+                    </div>
+                  )}
+
+                  <div className="text-[11px] text-slate-500 flex justify-between items-center pt-2">
+                    <span>Category: {trackResult.category}</span>
+                    <span>Created: {trackResult.created_at ? new Date(trackResult.created_at).toLocaleString() : '--'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          MODE 2: PROTECTED TEAM OPERATIONS CONSOLE
+          ───────────────────────────────────────────────────────────────────────────── */}
+      {viewMode === 'team' && (
+        <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+          
+          {/* Team Console Top Bar */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                  INTERNAL OPERATIONS
+                </span>
+                <span className="text-xs text-slate-500">Authorized Session</span>
+              </div>
+              <h2 className="text-2xl font-extrabold text-white mt-0.5">Support AI Telemetry & Triage Engine</h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('customer')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Customer Portal
+              </button>
+
+              <button
+                onClick={() => { fetchStats(); fetchTickets(); }}
+                disabled={refreshingTickets}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                title="Sync database records"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-blue-400' : ''}`} />
+                Sync DB
+              </button>
+            </div>
+          </div>
+
+          {/* Sub Navigation: Operations vs Tickets */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'dashboard'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
+              onClick={() => setActiveTeamTab('dashboard')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTeamTab === 'dashboard'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <BarChart3 className="w-4 h-4" /> Operations Console
             </button>
             <button
-              onClick={() => { setActiveTab('tickets'); fetchTickets(); }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                activeTab === 'tickets'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
+              onClick={() => { setActiveTeamTab('tickets'); fetchTickets(); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTeamTab === 'tickets'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Inbox className="w-4 h-4" /> Live Inbound Tickets ({tickets.length})
+              <Inbox className="w-4 h-4" /> Inbound Ticket Ledger ({tickets.length})
             </button>
           </div>
 
-          <button
-            onClick={() => { fetchStats(); fetchTickets(); }}
-            disabled={refreshingTickets}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/60 transition-all"
-            title="Refresh database records"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-blue-400' : ''}`} />
-            Sync DB
-          </button>
-        </div>
+          {activeTeamTab === 'dashboard' ? (
+            <div className="space-y-6">
+              
+              {/* KPI Metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Tickets</p>
+                      <h3 className="text-3xl font-extrabold mt-1 text-white">{stats ? stats['Tickets Today'] : '--'}</h3>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <Inbox className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> Recorded in PostgreSQL ledger
+                  </p>
+                </div>
 
-        {activeTab === 'dashboard' ? (
-          <div className="space-y-6">
-            
-            {/* KPI Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm group hover:border-slate-700 transition-all">
-                <div className="flex justify-between items-start">
+                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Autonomous Resolved</p>
+                      <h3 className="text-3xl font-extrabold mt-1 text-emerald-400">{stats ? stats['AI Resolved'] : '--'}</h3>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-emerald-400/80 mt-3 font-semibold">
+                    {stats ? stats['Resolution Rate'] : '--'} Resolution Rate
+                  </p>
+                </div>
+
+                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Human Escalated</p>
+                      <h3 className="text-3xl font-extrabold mt-1 text-amber-400">{stats ? stats['Human Escalated'] : '--'}</h3>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-amber-400/80 mt-3 font-semibold">
+                    {stats ? stats['Escalation Rate'] : '--'} Safety Escalation Rate
+                  </p>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 rounded-2xl relative overflow-hidden shadow-lg text-white flex flex-col justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Tickets</p>
-                    <h3 className="text-3xl font-extrabold mt-1 text-white">{stats ? stats['Tickets Today'] : '--'}</h3>
+                    <div className="flex justify-between items-center">
+                      <p className="text-xs font-medium text-blue-100 uppercase tracking-wider">Pipeline Latency</p>
+                      <Zap className="w-4 h-4 text-blue-200" />
+                    </div>
+                    <h3 className="text-3xl font-extrabold mt-1">~ 2.1 sec</h3>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    <Inbox className="w-5 h-5" />
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> Recorded in PostgreSQL ledger
-                </p>
-              </div>
-
-              <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm group hover:border-emerald-500/30 transition-all">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Autonomous Resolved</p>
-                    <h3 className="text-3xl font-extrabold mt-1 text-emerald-400">{stats ? stats['AI Resolved'] : '--'}</h3>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                </div>
-                <p className="text-[11px] text-emerald-400/80 mt-3 font-semibold">
-                  {stats ? stats['Resolution Rate'] : '--'} Resolution Rate
-                </p>
-              </div>
-
-              <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm group hover:border-amber-500/30 transition-all">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Human Escalated</p>
-                    <h3 className="text-3xl font-extrabold mt-1 text-amber-400">{stats ? stats['Human Escalated'] : '--'}</h3>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <AlertTriangle className="w-5 h-5" />
-                  </div>
-                </div>
-                <p className="text-[11px] text-amber-400/80 mt-3 font-semibold">
-                  {stats ? stats['Escalation Rate'] : '--'} Safety Escalation Rate
-                </p>
-              </div>
-
-              <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 rounded-2xl relative overflow-hidden shadow-lg shadow-blue-500/15 text-white flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center">
-                    <p className="text-xs font-medium text-blue-100 uppercase tracking-wider">Pipeline Latency</p>
-                    <Zap className="w-4 h-4 text-blue-200" />
-                  </div>
-                  <h3 className="text-3xl font-extrabold mt-1">~ 2.1 sec</h3>
-                </div>
-                <p className="text-[11px] text-blue-200 mt-3">
-                  Autonomous 6-Stage Graph Execution
-                </p>
-              </div>
-            </div>
-
-            {/* Interactive Simulation & Test Console */}
-            <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Terminal className="w-5 h-5 text-blue-400" /> Inbound Ticket Simulator
-                  </h2>
-                  <p className="text-xs text-slate-400">
-                    Test the agent with custom queries or 1-click test scenarios covering RAG retrieval, tool lookup, and safety escalation.
+                  <p className="text-[11px] text-blue-200 mt-3">
+                    LangGraph 6-Node Execution
                   </p>
                 </div>
               </div>
 
-              {/* Preset Scenario Buttons */}
-              <div className="mb-4">
-                <p className="text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Quick Test Presets:</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {/* Inbound Ticket Simulator with Quick Presets */}
+              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
+                <div className="mb-4">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-blue-400" /> Agent Simulator & Quick Discovery Presets
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Test how the LangGraph pipeline categorizes, retrieves knowledge, executes tools, and evaluates safety.
+                  </p>
+                </div>
+
+                {/* Presets */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
                   {PRESET_SCENARIOS.map((preset, idx) => (
                     <button
                       key={idx}
@@ -450,331 +873,380 @@ export default function Dashboard() {
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* Simulation Form */}
-              <form onSubmit={simulateTicket} className="space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-1">
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Customer Email</label>
-                    <input
-                      type="email"
-                      value={simEmail}
-                      onChange={e => setSimEmail(e.target.value)}
-                      placeholder="e.g. john@example.com"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Customer Message</label>
-                    <input
-                      type="text"
-                      value={simMessage}
-                      onChange={e => setSimMessage(e.target.value)}
-                      placeholder="Type ticket inquiry or problem description..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
-                  >
-                    {loading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Executing LangGraph Pipeline...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" /> Run Autonomous Triage
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Visual LangGraph 6-Node Architecture Pipeline */}
-            <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
-              <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" /> LangGraph Architecture Pipeline Flow
-              </h3>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                  { step: "1", name: "Intake", desc: "LLM Classification", icon: Bot, color: "text-purple-400" },
-                  { step: "2", name: "Verify", desc: "Customer ID & Tier", icon: User, color: "text-blue-400" },
-                  { step: "3", name: "Tools / RAG", desc: "Qdrant Vector KB", icon: BookOpen, color: "text-emerald-400" },
-                  { step: "4", name: "Resolution", desc: "Gemini 3.6 Flash", icon: Sparkles, color: "text-amber-400" },
-                  { step: "5", name: "Safety Gate", desc: "Escalation Policy", icon: ShieldCheck, color: "text-rose-400" },
-                  { step: "6", name: "Outcome", desc: "Resolved / Zendesk", icon: CheckCircle2, color: "text-emerald-400" },
-                ].map((node, i) => (
-                  <div key={i} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex flex-col justify-between relative overflow-hidden">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-mono font-bold text-slate-500">#{node.step}</span>
-                      <node.icon className={`w-4 h-4 ${node.color}`} />
+                {/* Simulation Form */}
+                <form onSubmit={simulateTicket} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Customer Email</label>
+                      <input
+                        type="email"
+                        value={simEmail}
+                        onChange={e => setSimEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        required
+                      />
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-200">{node.name}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{node.desc}</p>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Customer Message</label>
+                      <input
+                        type="text"
+                        value={simMessage}
+                        onChange={e => setSimMessage(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        required
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Execution Telemetry Result & Response */}
-            {latestTicket && (
-              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-800 pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
-                      Ticket #{latestTicket.ticket_id}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                      latestTicket.status === 'resolved' 
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                    }`}>
-                      {latestTicket.status === 'resolved' ? (
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={loadingSim}
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-semibold text-xs shadow-md active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
+                    >
+                      {loadingSim ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" /> AI Resolved
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Running Agent...
                         </>
                       ) : (
                         <>
-                          <AlertTriangle className="w-3.5 h-3.5" /> Escalated to Human
+                          <Send className="w-4 h-4" /> Run Autonomous Triage
                         </>
                       )}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-lg text-xs bg-slate-800 text-slate-300 border border-slate-700">
-                      Category: {latestTicket.category || "General"}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-lg text-xs bg-slate-800 text-slate-300 border border-slate-700">
-                      Priority: {latestTicket.priority || "Medium"}
-                    </span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Visual LangGraph 6-Node Architecture */}
+              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
+                <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                  <Activity className="w-4 h-4 text-emerald-400" /> LangGraph Architecture Pipeline Flow
+                </h3>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {[
+                    { step: "1", name: "Intake", desc: "LLM Classification", icon: Bot, color: "text-purple-400" },
+                    { step: "2", name: "Verify", desc: "Customer ID & Tier", icon: User, color: "text-blue-400" },
+                    { step: "3", name: "Tools / RAG", desc: "Qdrant Vector KB", icon: BookOpen, color: "text-emerald-400" },
+                    { step: "4", name: "Resolution", desc: "Gemini 3.6 Flash", icon: Sparkles, color: "text-amber-400" },
+                    { step: "5", name: "Safety Gate", desc: "Escalation Policy", icon: ShieldCheck, color: "text-rose-400" },
+                    { step: "6", name: "Outcome", desc: "Resolved / Zendesk", icon: CheckCircle2, color: "text-emerald-400" },
+                  ].map((node, i) => (
+                    <div key={i} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-mono font-bold text-slate-500">#{node.step}</span>
+                        <node.icon className={`w-4 h-4 ${node.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">{node.name}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{node.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Simulation Output Card */}
+              {latestSimTicket && (
+                <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                        Ticket #{latestSimTicket.ticket_id}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                        latestSimTicket.status === 'resolved' 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                      }`}>
+                        {latestSimTicket.status === 'resolved' ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" /> AI Resolved
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-3.5 h-3.5" /> Escalated to Human
+                          </>
+                        )}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-lg text-xs bg-slate-800 text-slate-300 border border-slate-700">
+                        Category: {latestSimTicket.category || "General"}
+                      </span>
+                    </div>
+
+                    {latestSimTicket.draft_response && (
+                      <button
+                        onClick={() => handleCopy(latestSimTicket.draft_response || "")}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all border border-slate-700"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copied ? "Copied!" : "Copy Response"}
+                      </button>
+                    )}
                   </div>
 
-                  {latestTicket.draft_response && (
-                    <button
-                      onClick={() => handleCopyResponse(latestTicket.draft_response || "")}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all border border-slate-700"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copied ? "Copied!" : "Copy Response"}
-                    </button>
+                  {latestSimTicket.status === 'escalated' ? (
+                    <HandoffPackage ticket={{
+                      customer: { 
+                        email: simEmail, 
+                        isVerified: Boolean(latestSimTicket.is_verified), 
+                        tier: latestSimTicket.is_verified ? "standard" : "none" 
+                      },
+                      rawMessage: simMessage,
+                      category: latestSimTicket.category || "General",
+                      intent: latestSimTicket.intent || "Inquiry",
+                      priority: latestSimTicket.priority || "Medium",
+                      aiFindings: latestSimTicket.ai_findings || "",
+                      toolsExecuted: latestSimTicket.tools_executed || [],
+                      escalationReason: latestSimTicket.escalation_reason || "Autonomous processing escalation."
+                    }} />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-xl">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Bot className="w-4 h-4 text-emerald-400" /> Grounded AI Solution Drafted:
+                          </span>
+                          <span className="text-[11px] text-emerald-400 font-mono">Grounded by ZENIVIXON Master KB</span>
+                        </div>
+                        <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-xl border border-slate-800/80">
+                          {latestSimTicket.draft_response || "Inquiry processed and closed."}
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <Terminal className="w-3.5 h-3.5 text-blue-400" /> LangGraph Telemetry Execution Trace:
+                        </p>
+                        <div className="space-y-1.5 font-mono text-xs text-slate-300">
+                          {latestSimTicket.trace?.map((step: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/60">
+                              <span className="text-blue-400 select-none">[{idx + 1}]</span>
+                              <span className="text-slate-200">{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {latestTicket.status === 'escalated' ? (
-                  <HandoffPackage ticket={{
-                    customer: { 
-                      email: simEmail, 
-                      isVerified: Boolean(latestTicket.is_verified), 
-                      tier: latestTicket.is_verified ? "standard" : "none" 
-                    },
-                    rawMessage: simMessage,
-                    category: latestTicket.category || "General",
-                    intent: latestTicket.intent || "Inquiry",
-                    priority: latestTicket.priority || "Medium",
-                    aiFindings: latestTicket.ai_findings || "",
-                    toolsExecuted: latestTicket.tools_executed || [],
-                    escalationReason: latestTicket.escalation_reason || "Autonomous processing escalation."
-                  }} />
-                ) : (
-                  <div className="space-y-4">
-                    {/* Draft AI Response Card */}
-                    <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-xl">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <Bot className="w-4 h-4 text-emerald-400" /> Grounded AI Solution Drafted:
-                        </span>
-                        <span className="text-[11px] text-emerald-400 font-mono">Grounded by ZENIVIXON Master KB</span>
-                      </div>
-                      <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-xl border border-slate-800/80">
-                        {latestTicket.draft_response || "Inquiry processed and closed."}
-                      </div>
-                    </div>
-
-                    {/* Agent Trace Logs */}
-                    <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                        <Terminal className="w-3.5 h-3.5 text-blue-400" /> LangGraph Telemetry Execution Trace:
-                      </p>
-                      <div className="space-y-1.5 font-mono text-xs text-slate-300">
-                        {latestTicket.trace?.map((step: string, idx: number) => (
-                          <div key={idx} className="flex items-start gap-2 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/60">
-                            <span className="text-blue-400 select-none">[{idx + 1}]</span>
-                            <span className="text-slate-200">{step}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+              )}
+            </div>
+          ) : (
+            /* Inbound Ticket Ledger */
+            <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden shadow-md">
+              <div className="p-5 border-b border-slate-800 space-y-4">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="font-bold text-base text-white">Live Inbound Ticket Ledger</h3>
+                    <p className="text-xs text-slate-400">Total tickets recorded in Neon PostgreSQL: {tickets.length}</p>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Live Tickets Management Ledger */
-          <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden shadow-md">
-            
-            {/* Header with Search and Filter Toolbar */}
-            <div className="p-5 border-b border-slate-800 space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                  <h3 className="font-bold text-lg text-white">Live Inbound Ticket Ledger</h3>
-                  <p className="text-xs text-slate-400">Total tickets recorded in Neon PostgreSQL: {tickets.length}</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      placeholder="Search email, ticket ID, or message..."
+                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-3.5 h-3.5 text-slate-400" />
+                    <select
+                      value={statusFilter}
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="escalated">Escalated</option>
+                      <option value="open">Open / Processing</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <select
+                      value={categoryFilter}
+                      onChange={e => setCategoryFilter(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="General">General</option>
+                      <option value="Technical">Technical</option>
+                      <option value="Billing">Billing</option>
+                      <option value="Product">Product</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Filters Toolbar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Search input */}
-                <div className="relative">
-                  <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search email, ticket ID, or message..."
-                    className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                  />
+              {filteredTickets.length === 0 ? (
+                <div className="text-center py-16 text-slate-500">
+                  <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No tickets matched your filter criteria.</p>
                 </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/80 text-slate-400 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-800">
+                      <tr>
+                        <th className="py-3.5 px-4">Ticket</th>
+                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4 max-w-sm">Message Snippet</th>
+                        <th className="py-3.5 px-4">Category</th>
+                        <th className="py-3.5 px-4">Priority</th>
+                        <th className="py-3.5 px-4">Status</th>
+                        <th className="py-3.5 px-4">Timestamp</th>
+                        <th className="py-3.5 px-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {filteredTickets.map(t => (
+                        <tr 
+                          key={t.id} 
+                          className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                          onClick={() => openTicketDetail(t.id)}
+                        >
+                          <td className="py-3 px-4 font-mono font-bold text-blue-400">
+                            #{t.id}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-slate-200">{t.customer_email}</p>
+                            <span className="text-[10px] text-slate-500 capitalize">{t.customer_tier} tier</span>
+                          </td>
+                          <td className="py-3 px-4 max-w-sm">
+                            <p className="truncate text-slate-300" title={t.raw_message}>
+                              {t.raw_message}
+                            </p>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                              {t.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              t.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              t.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {t.priority}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                              t.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              t.status === 'escalated' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                              'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            }`}>
+                              {t.status === 'resolved' ? <CheckCircle2 className="w-3 h-3" /> :
+                               t.status === 'escalated' ? <AlertTriangle className="w-3 h-3" /> :
+                               <Clock className="w-3 h-3" />}
+                              {t.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                            {t.created_at ? new Date(t.created_at).toLocaleDateString() : '--'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openTicketDetail(t.id);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-all"
+                              title="Inspect ticket"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
-                {/* Status filter */}
-                <div className="flex items-center gap-2">
-                  <Filter className="w-3.5 h-3.5 text-slate-400" />
-                  <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="escalated">Escalated</option>
-                    <option value="open">Open / Processing</option>
-                  </select>
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          TEAM PASSCODE AUTHENTICATION MODAL
+          ───────────────────────────────────────────────────────────────────────────── */}
+      {showPasscodeModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0D1527] border border-slate-700/80 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+                  <Key className="w-5 h-5" />
                 </div>
-
-                {/* Category filter */}
-                <div>
-                  <select
-                    value={categoryFilter}
-                    onChange={e => setCategoryFilter(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="all">All Categories</option>
-                    <option value="General">General</option>
-                    <option value="Technical">Technical</option>
-                    <option value="Billing">Billing</option>
-                    <option value="Product">Product</option>
-                  </select>
-                </div>
+                <h3 className="font-bold text-base text-white">Team Console Access</h3>
               </div>
+              <button
+                onClick={() => setShowPasscodeModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Table */}
-            {filteredTickets.length === 0 ? (
-              <div className="text-center py-16 text-slate-500">
-                <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No tickets matched your filter criteria.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/80 text-slate-400 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-800">
-                    <tr>
-                      <th className="py-3.5 px-4">Ticket</th>
-                      <th className="py-3.5 px-4">Customer</th>
-                      <th className="py-3.5 px-4 max-w-sm">Message Snippet</th>
-                      <th className="py-3.5 px-4">Category</th>
-                      <th className="py-3.5 px-4">Priority</th>
-                      <th className="py-3.5 px-4">Status</th>
-                      <th className="py-3.5 px-4">Timestamp</th>
-                      <th className="py-3.5 px-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60">
-                    {filteredTickets.map(t => (
-                      <tr 
-                        key={t.id} 
-                        className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
-                        onClick={() => openTicketDetail(t.id)}
-                      >
-                        <td className="py-3 px-4 font-mono font-bold text-blue-400">
-                          #{t.id}
-                        </td>
-                        <td className="py-3 px-4">
-                          <p className="font-semibold text-slate-200">{t.customer_email}</p>
-                          <span className="text-[10px] text-slate-500 capitalize">{t.customer_tier} tier</span>
-                        </td>
-                        <td className="py-3 px-4 max-w-sm">
-                          <p className="truncate text-slate-300" title={t.raw_message}>
-                            {t.raw_message}
-                          </p>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
-                            {t.category}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            t.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            t.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}>
-                            {t.priority}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
-                            t.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            t.status === 'escalated' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          }`}>
-                            {t.status === 'resolved' ? <CheckCircle2 className="w-3 h-3" /> :
-                             t.status === 'escalated' ? <AlertTriangle className="w-3 h-3" /> :
-                             <Clock className="w-3 h-3" />}
-                            {t.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                          {t.created_at ? new Date(t.created_at).toLocaleDateString() : '--'}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openTicketDetail(t.id);
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-all"
-                            title="Inspect ticket"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+            <p className="text-xs text-slate-400">
+              Please enter the team access passcode to view live agent telemetry and internal operations ledger.
+            </p>
 
-      {/* Full Ticket Detail Inspection Modal */}
+            <form onSubmit={handleVerifyPasscode} className="space-y-3">
+              <div>
+                <input
+                  type="password"
+                  autoFocus
+                  value={passcodeInput}
+                  onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(false); }}
+                  placeholder="Enter passcode (e.g. zenivixon)"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+                {passcodeError && (
+                  <p className="text-xs text-rose-400 mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> Incorrect passcode. Try &ldquo;zenivixon&rdquo;
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasscodeModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all"
+                >
+                  Authorize Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          TICKET INSPECTOR MODAL (TEAM CONSOLE)
+          ───────────────────────────────────────────────────────────────────────────── */}
       {selectedTicketId && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0D1527] border border-slate-700/80 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            {/* Modal Header */}
             <div className="p-5 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-[#0D1527] z-10">
               <div className="flex items-center gap-3">
                 <span className="font-mono text-sm font-bold text-blue-400">
@@ -800,7 +1272,6 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-5 flex-1">
               {loadingDetail ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
@@ -809,7 +1280,6 @@ export default function Dashboard() {
                 </div>
               ) : ticketDetail ? (
                 <>
-                  {/* Customer Context */}
                   <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
                     <div>
                       <p className="text-xs text-slate-400 uppercase font-semibold">Customer</p>
@@ -829,7 +1299,6 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Inbound Message */}
                   <div>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Original Message</p>
                     <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 italic">
@@ -837,11 +1306,10 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* AI Resolution Draft */}
                   {ticketDetail.draft_response && (
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                        <Bot className="w-4 h-4 text-emerald-400" /> AI Grounded Response Draft
+                        <Bot className="w-4 h-4 text-emerald-400" /> Grounded AI Solution
                       </p>
                       <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
                         {ticketDetail.draft_response}
@@ -849,17 +1317,15 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  {/* AI Findings or Escalation Reason */}
                   {ticketDetail.escalation_reason && (
                     <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
                       <span className="font-bold flex items-center gap-1 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-rose-400" /> Escalation Reason:
+                        <AlertTriangle className="w-4 h-4 text-rose-400" /> Escalation Trigger:
                       </span>
                       {ticketDetail.escalation_reason}
                     </div>
                   )}
 
-                  {/* Tools Executed */}
                   {ticketDetail.tools_executed && ticketDetail.tools_executed.length > 0 && (
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tools Executed</p>
@@ -877,10 +1343,9 @@ export default function Dashboard() {
               ) : null}
             </div>
 
-            {/* Modal Actions */}
             {ticketDetail && (
               <div className="p-5 border-t border-slate-800 flex justify-between items-center bg-[#0D1527] sticky bottom-0">
-                <span className="text-xs text-slate-500">Update ticket state:</span>
+                <span className="text-xs text-slate-500">Update status:</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleUpdateStatus(ticketDetail.id, 'resolved')}
@@ -905,3 +1370,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
