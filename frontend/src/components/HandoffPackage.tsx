@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, AlertCircle, Bot, Activity, CheckCircle2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { User, AlertCircle, Bot, Activity, CheckCircle2, AlertTriangle, MessageSquare, ShieldAlert, Zap } from 'lucide-react';
 
 export interface HandoffCustomer {
   email: string;
@@ -23,10 +23,30 @@ export interface HandoffTicket {
   aiFindings: string;
   toolsExecuted: ToolExecutionItem[];
   escalationReason: string;
+  churnRiskScore?: number;
+  recommendedAction?: string;
 }
 
 export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | null }) {
   if (!ticket) return null;
+
+  // Smart Retention Logic (using backend computed values or high-fidelity fallback)
+  const isEnterprise = ticket.customer.tier.toLowerCase() === 'enterprise';
+  const isCritical = ticket.priority.toLowerCase() === 'critical';
+  
+  let churnRiskScore = ticket.churnRiskScore ?? 35;
+  if (!ticket.churnRiskScore) {
+    if (isCritical) churnRiskScore += 40;
+    if (isEnterprise) churnRiskScore += 15;
+    if (ticket.escalationReason.toLowerCase().includes('angry')) churnRiskScore += 10;
+    churnRiskScore = Math.min(churnRiskScore, 98);
+  }
+
+  const retentionPoints = ticket.recommendedAction || (isEnterprise
+    ? "Enterprise VIP Account: Waive SLA penalty, assign Lead Solutions Architect, schedule 1-on-1 recovery call."
+    : isCritical
+    ? "Critical Risk: Lead with empathy, confirm timeline under 2 hours, offer service credit upon resolution."
+    : "Standard Tier: Acknowledge ticket, review recent account history, provide clear ETA.");
 
   return (
     <div className="bg-white dark:bg-slate-900/50 border border-red-200 dark:border-red-900/50 rounded-2xl shadow-xl overflow-hidden mt-6">
@@ -36,9 +56,14 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
           <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
           <h3 className="font-bold text-red-900 dark:text-red-300 font-heading">Human Escalation Required</h3>
         </div>
-        <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 text-xs font-bold rounded-full uppercase tracking-widest">
-          {ticket.priority} Priority
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-xs font-bold rounded-full flex items-center gap-1">
+            <ShieldAlert className="w-3.5 h-3.5" /> Churn Risk: {churnRiskScore}%
+          </span>
+          <span className="px-3 py-1 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 text-xs font-bold rounded-full uppercase tracking-widest">
+            {ticket.priority} Priority
+          </span>
+        </div>
       </div>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -91,6 +116,15 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
             </h4>
             <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-4 rounded-xl text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
               {ticket.aiFindings}
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[11px] font-bold tracking-widest text-violet-500 uppercase mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-violet-500" /> Recommended Retention Action
+            </h4>
+            <div className="bg-violet-50/60 dark:bg-violet-900/10 border border-violet-100 dark:border-violet-900/30 p-4 rounded-xl text-sm text-violet-900 dark:text-violet-200 leading-relaxed font-medium">
+              {retentionPoints}
             </div>
           </div>
 

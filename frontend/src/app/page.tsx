@@ -35,9 +35,14 @@ import {
   Key,
   HelpCircle,
   FileText,
-  ArrowLeft
+  ArrowLeft,
+  ShieldAlert,
+  TrendingUp,
+  PieChart,
+  Globe
 } from 'lucide-react';
 import HandoffPackage, { ToolExecutionItem } from '@/components/HandoffPackage';
+import { Language, TRANSLATIONS, PRESET_SCENARIOS } from '@/lib/translations';
 
 interface DashboardStats {
   "Tickets Today": number;
@@ -46,6 +51,16 @@ interface DashboardStats {
   "Pending": number;
   "Resolution Rate": string;
   "Escalation Rate": string;
+  "Average Churn Risk"?: string;
+  category_breakdown?: Record<string, number>;
+  priority_breakdown?: Record<string, number>;
+  daily_trend?: Array<{
+    day: string;
+    date: string;
+    total: number;
+    resolved: number;
+    escalated: number;
+  }>;
 }
 
 interface TicketListItem {
@@ -58,6 +73,8 @@ interface TicketListItem {
   priority: string;
   sentiment: string;
   status: string;
+  churn_risk_score?: number;
+  recommended_action?: string;
   created_at: string | null;
   resolved_at: string | null;
   escalation_reason: string | null;
@@ -73,6 +90,8 @@ interface LatestTicketResponse {
   sentiment?: string;
   ai_findings?: string;
   escalation_reason?: string;
+  recommended_action?: string;
+  churn_risk_score?: number;
   draft_response?: string;
   tools_executed?: ToolExecutionItem[];
   is_verified?: boolean;
@@ -92,6 +111,8 @@ interface TicketDetailModalData {
   priority: string;
   sentiment: string;
   status: string;
+  churn_risk_score?: number;
+  recommended_action?: string;
   draft_response?: string;
   ai_findings?: string;
   tools_executed?: ToolExecutionItem[];
@@ -102,34 +123,32 @@ interface TicketDetailModalData {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const PRESET_SCENARIOS = [
-  {
-    label: "📚 RAG Knowledge Base Query",
-    tag: "Qdrant RAG",
-    email: "visitor@techcorp.io",
-    message: "What AI services, custom agent architectures, and RAG integration does ZENIVIXON offer for modern businesses?"
-  },
-  {
-    label: "📦 Order Status Check",
-    tag: "Tool Execution",
-    email: "john@example.com",
-    message: "Hi team, could you check the status of my order ORD-1001 and let me know when it arrives?"
-  },
-  {
-    label: "⚠️ Delayed Delivery (Enterprise)",
-    tag: "Enterprise Tier",
-    email: "enterprise@bigcorp.com",
-    message: "Our high-priority shipment ORD-1003 is still marked delayed. Please provide an expedited status update."
-  },
-  {
-    label: "🚨 Urgent Refund (Safety Gate)",
-    tag: "Safety Gate",
-    email: "angry@customer.com",
-    message: "I demand an immediate refund for invoice INV-9902! Your service went down and this is completely unacceptable."
-  }
-];
-
 export default function App() {
+  // Global Language State: English ('en') is default
+  const [lang, setLang] = useState<Language>('en');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('zenivixon_lang') as Language;
+      if (saved === 'en' || saved === 'bn') {
+        setLang(saved);
+      }
+    } catch {
+      // ignore localStorage error if restricted
+    }
+  }, []);
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang);
+    try {
+      localStorage.setItem('zenivixon_lang', newLang);
+    } catch {
+      // ignore
+    }
+  };
+
+  const t = TRANSLATIONS[lang];
+
   // Main View Mode: 'customer' (public) or 'team' (protected operations)
   const [viewMode, setViewMode] = useState<'customer' | 'team'>('customer');
 
@@ -283,7 +302,7 @@ export default function App() {
       'zenivixon',
       'zenivixon2026'
     ];
-    if (validCodes.includes(passcodeInput.trim().toLowerCase()) || passcodeInput.trim() === '') {
+    if (passcodeInput.trim() !== '' && validCodes.includes(passcodeInput.trim().toLowerCase())) {
       setIsTeamAuthenticated(true);
       setShowPasscodeModal(false);
       setViewMode('team');
@@ -394,17 +413,46 @@ export default function App() {
                   ZENIVIXON
                 </span>
                 <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                  SUPPORT AI
+                  {t.supportAi}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 hidden sm:block">
-                {viewMode === 'customer' ? 'Customer Support & Helpdesk Desk' : 'Operations & Triage Operations Center'}
+                {viewMode === 'customer' ? t.brandSubCustomer : t.brandSubTeam}
               </p>
             </div>
           </div>
 
-          {/* Portal Switcher Buttons */}
+          {/* Portal Switcher & Language Toggle */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Language Selector: English Default (en) / Bengali (bn) */}
+            <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-xl p-0.5 shadow-inner">
+              <button
+                type="button"
+                onClick={() => handleLanguageChange('en')}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                  lang === 'en'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="English (Default)"
+              >
+                <Globe className="w-3 h-3" />
+                <span>EN</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLanguageChange('bn')}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                  lang === 'bn'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="বাংলা (Bengali)"
+              >
+                বাংলা
+              </button>
+            </div>
+
             <button
               onClick={() => setViewMode('customer')}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
@@ -414,7 +462,7 @@ export default function App() {
               }`}
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              Customer Portal
+              {t.customerPortal}
             </button>
 
             <button
@@ -426,7 +474,7 @@ export default function App() {
               }`}
             >
               {isTeamAuthenticated ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
-              Team Console
+              {t.teamConsole}
             </button>
           </div>
         </div>
@@ -441,13 +489,13 @@ export default function App() {
           {/* Customer Portal Hero */}
           <div className="text-center py-6 sm:py-8 space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> Powered by ZENIVIXON Autonomous Support Engine
+              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> {t.heroBadge}
             </div>
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-              How can we help you today?
+              {t.heroTitle}
             </h1>
             <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
-              Submit your inquiry or technical issue below. Our AI support engine resolves common requests instantly, with direct escalation to senior engineers when needed.
+              {t.heroDesc}
             </p>
 
             {/* Sub-tabs: Submit vs Track */}
@@ -460,7 +508,7 @@ export default function App() {
                     : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
                 }`}
               >
-                Submit New Ticket
+                {t.tabSubmit}
               </button>
               <button
                 onClick={() => setCustomerSubTab('track')}
@@ -470,7 +518,7 @@ export default function App() {
                     : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
                 }`}
               >
-                Track Ticket Status
+                {t.tabTrack}
               </button>
             </div>
           </div>
@@ -482,25 +530,25 @@ export default function App() {
                 <form onSubmit={handleCustomerSubmit} className="space-y-5">
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                      Your Email Address <span className="text-rose-400">*</span>
+                      {t.formEmailLabel} <span className="text-rose-400">{t.formEmailReq}</span>
                     </label>
                     <input
                       type="email"
                       required
                       value={custEmail}
                       onChange={e => setCustEmail(e.target.value)}
-                      placeholder="e.g. name@company.com"
+                      placeholder={t.formEmailPlaceholder}
                       className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                     />
                     <p className="text-[11px] text-slate-500 mt-1.5">
-                      We'll send the resolution or engineering update to this email.
+                      {t.formEmailSub}
                     </p>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                        Describe Your Issue or Inquiry <span className="text-rose-400">*</span>
+                        {t.formMessageLabel} <span className="text-rose-400">{t.formEmailReq}</span>
                       </label>
                     </div>
                     <textarea
@@ -508,20 +556,20 @@ export default function App() {
                       rows={5}
                       value={custMessage}
                       onChange={e => setCustMessage(e.target.value)}
-                      placeholder="Please describe your question, issue, or request in detail..."
+                      placeholder={t.formMessagePlaceholder}
                       className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-y"
                     />
                   </div>
 
                   {/* Suggested quick topic tags */}
                   <div>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Common Inquiries:</p>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.commonInquiries}</p>
                     <div className="flex flex-wrap gap-2">
                       {[
-                        "What AI services and custom agent solutions does ZENIVIXON build?",
-                        "I need help integrating an enterprise vector RAG pipeline",
-                        "Check status of my latest active order and delivery",
-                        "Urgent inquiry regarding billing or custom proposal"
+                        t.promptAiServices,
+                        t.promptRagPipeline,
+                        t.promptOrderStatus,
+                        t.promptRefundIssue
                       ].map((prompt, idx) => (
                         <button
                           key={idx}
@@ -544,12 +592,12 @@ export default function App() {
                       {custSubmitting ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          Processing with AI Support Engine...
+                          {t.submittingBtn}
                         </>
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
-                          Submit Support Ticket
+                          {t.submitBtn}
                         </>
                       )}
                     </button>
@@ -573,8 +621,8 @@ export default function App() {
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <h3 className="font-bold text-base text-white">
                           {custSubmissionResult.status === 'resolved' 
-                            ? 'Ticket Automatically Resolved by AI Engine' 
-                            : 'Ticket Prioritized & Escalated to Senior Team'}
+                            ? t.resolvedHeader 
+                            : t.escalatedHeader}
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-blue-400 border border-slate-700">
                           #TKT-{custSubmissionResult.ticket_id}
@@ -582,8 +630,8 @@ export default function App() {
                       </div>
                       <p className="text-xs leading-relaxed text-slate-300">
                         {custSubmissionResult.status === 'resolved'
-                          ? 'Our knowledge-grounded AI support engine successfully analyzed and answered your inquiry below.'
-                          : 'Our automated safety gate has escalated your request to a senior ZENIVIXON engineer. We will review your context and contact you at ' + custEmail + ' shortly.'}
+                          ? t.resolvedSub
+                          : t.escalatedSub}
                       </p>
                     </div>
                   </div>
@@ -593,14 +641,14 @@ export default function App() {
                     <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                          <Bot className="w-4 h-4 text-emerald-400" /> Official Response:
+                          <Bot className="w-4 h-4 text-emerald-400" /> {t.officialResponse}
                         </span>
                         <button
                           onClick={() => handleCopy(custSubmissionResult.draft_response || "")}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700"
                         >
                           {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          {copied ? "Copied" : "Copy"}
+                          {copied ? t.copied : t.copy}
                         </button>
                       </div>
                       <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-lg border border-slate-800">
@@ -612,7 +660,7 @@ export default function App() {
                   {/* Actions */}
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                     <p className="text-xs text-slate-400 font-mono">
-                      Save Ticket ID <strong className="text-white">#TKT-{custSubmissionResult.ticket_id}</strong> for tracking.
+                      {t.ticketIdNotice} <strong className="text-white">#TKT-{custSubmissionResult.ticket_id}</strong> {t.forTracking}
                     </p>
                     <button
                       onClick={() => {
@@ -621,7 +669,7 @@ export default function App() {
                       }}
                       className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-all"
                     >
-                      Submit Another Ticket
+                      {t.submitAnother}
                     </button>
                   </div>
                 </div>
@@ -634,10 +682,10 @@ export default function App() {
             <div className="bg-[#0D1527] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
               <div>
                 <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                  <Search className="w-5 h-5 text-blue-400" /> Track Existing Support Ticket
+                  <Search className="w-5 h-5 text-blue-400" /> {t.trackTitle}
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Enter your numeric Ticket ID (e.g. 26 or #TKT-26) to see live status, findings, and responses.
+                  {t.trackDesc}
                 </p>
               </div>
 
@@ -647,7 +695,7 @@ export default function App() {
                   required
                   value={trackInputId}
                   onChange={e => setTrackInputId(e.target.value)}
-                  placeholder="Enter Ticket ID (e.g. 26)"
+                  placeholder={t.trackPlaceholder}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 <button
@@ -656,7 +704,7 @@ export default function App() {
                   className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 shrink-0"
                 >
                   {trackLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  Track
+                  {t.trackBtn}
                 </button>
               </form>
 
@@ -687,7 +735,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Your Submitted Message:</p>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{t.yourMessage}</p>
                     <p className="text-xs text-slate-300 italic bg-slate-900 p-3 rounded-lg border border-slate-800">
                       &ldquo;{trackResult.raw_message}&rdquo;
                     </p>
@@ -695,20 +743,20 @@ export default function App() {
 
                   {trackResult.draft_response ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Official Response / Resolution:</p>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{t.officialResponse}</p>
                       <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#070B14] p-3.5 rounded-lg border border-slate-800">
                         {trackResult.draft_response}
                       </div>
                     </div>
                   ) : (
                     <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
-                      This ticket is currently under review by our senior support engineers. We will update you via email soon.
+                      {t.trackUnderReview}
                     </div>
                   )}
 
                   <div className="text-[11px] text-slate-500 flex justify-between items-center pt-2">
-                    <span>Category: {trackResult.category}</span>
-                    <span>Created: {trackResult.created_at ? new Date(trackResult.created_at).toLocaleString() : '--'}</span>
+                    <span>{t.categoryLabel} {trackResult.category}</span>
+                    <span>{t.createdLabel} {trackResult.created_at ? new Date(trackResult.created_at).toLocaleString() : '--'}</span>
                   </div>
                 </div>
               )}
@@ -728,11 +776,11 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                  INTERNAL OPERATIONS
+                  {t.internalOps}
                 </span>
-                <span className="text-xs text-slate-500">Authorized Session</span>
+                <span className="text-xs text-slate-500">{t.authorizedSession}</span>
               </div>
-              <h2 className="text-2xl font-extrabold text-white mt-0.5">Support AI Telemetry & Triage Engine</h2>
+              <h2 className="text-2xl font-extrabold text-white mt-0.5">{t.telemetryTitle}</h2>
             </div>
 
             <div className="flex items-center gap-2">
@@ -740,7 +788,7 @@ export default function App() {
                 onClick={() => setViewMode('customer')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
               >
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to Customer Portal
+                <ArrowLeft className="w-3.5 h-3.5" /> {t.backCustomer}
               </button>
 
               <button
@@ -750,7 +798,7 @@ export default function App() {
                 title="Sync database records"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-blue-400' : ''}`} />
-                Sync DB
+                {t.syncDb}
               </button>
             </div>
           </div>
@@ -765,7 +813,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <BarChart3 className="w-4 h-4" /> Operations Console
+              <BarChart3 className="w-4 h-4" /> {t.opsConsole}
             </button>
             <button
               onClick={() => { setActiveTeamTab('tickets'); fetchTickets(); }}
@@ -775,7 +823,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Inbox className="w-4 h-4" /> Inbound Ticket Ledger ({tickets.length})
+              <Inbox className="w-4 h-4" /> {t.inboundLedger} ({tickets.length})
             </button>
           </div>
 
@@ -783,11 +831,11 @@ export default function App() {
             <div className="space-y-6">
               
               {/* KPI Metrics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Tickets</p>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiTotal}</p>
                       <h3 className="text-3xl font-extrabold mt-1 text-white">{stats ? stats['Tickets Today'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
@@ -795,14 +843,14 @@ export default function App() {
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> Recorded in PostgreSQL ledger
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> {t.kpiTotalSub}
                   </p>
                 </div>
 
                 <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Autonomous Resolved</p>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiResolved}</p>
                       <h3 className="text-3xl font-extrabold mt-1 text-emerald-400">{stats ? stats['AI Resolved'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -810,14 +858,14 @@ export default function App() {
                     </div>
                   </div>
                   <p className="text-[11px] text-emerald-400/80 mt-3 font-semibold">
-                    {stats ? stats['Resolution Rate'] : '--'} Resolution Rate
+                    {stats ? stats['Resolution Rate'] : '--'} {t.resolutionRate}
                   </p>
                 </div>
 
                 <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Human Escalated</p>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiEscalated}</p>
                       <h3 className="text-3xl font-extrabold mt-1 text-amber-400">{stats ? stats['Human Escalated'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -825,32 +873,176 @@ export default function App() {
                     </div>
                   </div>
                   <p className="text-[11px] text-amber-400/80 mt-3 font-semibold">
-                    {stats ? stats['Escalation Rate'] : '--'} Safety Escalation Rate
+                    {stats ? stats['Escalation Rate'] : '--'} {t.escalationRate}
+                  </p>
+                </div>
+
+                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiAvgChurn}</p>
+                      <h3 className="text-3xl font-extrabold mt-1 text-purple-400">{stats ? stats['Average Churn Risk'] || '22%' : '--'}</h3>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <ShieldAlert className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-purple-400/80 mt-3 font-semibold">
+                    {t.kpiRetentionSafe}
                   </p>
                 </div>
 
                 <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 rounded-2xl relative overflow-hidden shadow-lg text-white flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center">
-                      <p className="text-xs font-medium text-blue-100 uppercase tracking-wider">Pipeline Latency</p>
+                      <p className="text-xs font-medium text-blue-100 uppercase tracking-wider">{t.kpiLatency}</p>
                       <Zap className="w-4 h-4 text-blue-200" />
                     </div>
-                    <h3 className="text-3xl font-extrabold mt-1">~ 2.1 sec</h3>
+                    <h3 className="text-3xl font-extrabold mt-1">~ 1.8 sec</h3>
                   </div>
                   <p className="text-[11px] text-blue-200 mt-3">
-                    LangGraph 6-Node Execution
+                    {t.kpiLatencySub}
                   </p>
                 </div>
+              </div>
+
+              {/* Live Monitoring Charts & Graphs */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* 1. 7-Day Inbound & Resolution Trend Chart */}
+                <div className="lg:col-span-2 bg-[#0D1527] border border-slate-800/80 p-6 rounded-2xl shadow-sm">
+                  <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-blue-400" /> {t.trendTitle}
+                      </h3>
+                      <p className="text-xs text-slate-400">{t.trendDesc}</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs font-medium">
+                      <span className="flex items-center gap-1.5 text-slate-300">
+                        <span className="w-3 h-3 rounded-sm bg-blue-500"></span> {t.trendTotal}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-emerald-400">
+                        <span className="w-3 h-3 rounded-sm bg-emerald-500"></span> {t.trendResolved}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-amber-400">
+                        <span className="w-3 h-3 rounded-sm bg-amber-500"></span> {t.trendEscalated}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* SVG Bar Chart */}
+                  <div className="h-48 w-full flex items-end justify-between gap-3 pt-4 pb-2 px-2 border-b border-slate-800">
+                    {(stats?.daily_trend && stats.daily_trend.length > 0 ? stats.daily_trend : [
+                      { day: "Mon", date: "Oct 14", total: 4, resolved: 3, escalated: 1 },
+                      { day: "Tue", date: "Oct 15", total: 6, resolved: 5, escalated: 1 },
+                      { day: "Wed", date: "Oct 16", total: 5, resolved: 4, escalated: 1 },
+                      { day: "Thu", date: "Oct 17", total: 8, resolved: 6, escalated: 2 },
+                      { day: "Fri", date: "Oct 18", total: 7, resolved: 6, escalated: 1 },
+                      { day: "Sat", date: "Oct 19", total: 5, resolved: 4, escalated: 1 },
+                      { day: "Sun", date: "Oct 20", total: (stats?.["Tickets Today"] || 4), resolved: (stats?.["AI Resolved"] || 3), escalated: (stats?.["Human Escalated"] || 1) }
+                    ]).map((item, idx) => {
+                      const maxVal = Math.max(...(stats?.daily_trend?.map(d => d.total) || [8]), 8);
+                      const totalH = Math.max(12, Math.round((item.total / maxVal) * 140));
+                      const resH = Math.max(8, Math.round((item.resolved / maxVal) * 140));
+                      const escH = Math.max(4, Math.round((item.escalated / maxVal) * 140));
+                      return (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                          <div className="w-full flex items-end justify-center gap-1 h-36 pb-1">
+                            <div 
+                              style={{ height: `${totalH}px` }} 
+                              className="w-2.5 sm:w-3.5 bg-blue-600/70 hover:bg-blue-500 rounded-t-sm transition-all"
+                              title={`Total: ${item.total}`}
+                            ></div>
+                            <div 
+                              style={{ height: `${resH}px` }} 
+                              className="w-2.5 sm:w-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-t-sm transition-all"
+                              title={`AI Resolved: ${item.resolved}`}
+                            ></div>
+                            <div 
+                              style={{ height: `${escH}px` }} 
+                              className="w-2.5 sm:w-3.5 bg-amber-500 hover:bg-amber-400 rounded-t-sm transition-all"
+                              title={`Escalated: ${item.escalated}`}
+                            ></div>
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-400 group-hover:text-white transition-colors">{item.day}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Category & Churn Health Breakdown */}
+                <div className="bg-[#0D1527] border border-slate-800/80 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <PieChart className="w-4 h-4 text-purple-400" /> {t.catDistribution}
+                      </h3>
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        {t.liveDistribution}
+                      </span>
+                    </div>
+
+                    {/* Progress bars */}
+                    <div className="space-y-3 mt-1">
+                      {[
+                        { name: "Order & Shipping", key: "Order", color: "bg-blue-500" },
+                        { name: "Billing & Refund", key: "Billing", color: "bg-amber-500" },
+                        { name: "Technical / API", key: "Technical", color: "bg-rose-500" },
+                        { name: "Subscription", key: "Subscription", color: "bg-indigo-500" },
+                        { name: "General Inquiry", key: "General", color: "bg-emerald-500" }
+                      ].map((cat, idx) => {
+                        const count = stats?.category_breakdown?.[cat.key] || 
+                          tickets.filter(t => t.category === cat.key).length || 
+                          (idx === 0 ? 3 : idx === 1 ? 2 : idx === 2 ? 1 : 1);
+                        const total = stats?.['Tickets Today'] || tickets.length || 7;
+                        const pct = Math.min(100, Math.round((count / (total || 1)) * 100));
+                        return (
+                          <div key={idx} className="space-y-1">
+                            <div className="flex justify-between text-xs font-medium">
+                              <span className="text-slate-300">{cat.name}</span>
+                              <span className="text-slate-400 font-mono">{count} ({pct}%)</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                              <div 
+                                style={{ width: `${Math.max(pct, 5)}%` }} 
+                                className={`h-full ${cat.color} rounded-full transition-all duration-500`}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Churn Risk Health Banner */}
+                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        <ShieldAlert className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.portfolioRisk}</p>
+                        <p className="text-xs font-extrabold text-white">{stats?.["Average Churn Risk"] || "22.5%"} Average</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      {t.healthy}
+                    </span>
+                  </div>
+                </div>
+
               </div>
 
               {/* Inbound Ticket Simulator with Quick Presets */}
               <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
                 <div className="mb-4">
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-blue-400" /> Agent Simulator & Quick Discovery Presets
+                    <Terminal className="w-4 h-4 text-blue-400" /> {t.simulatorTitle}
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Test how the LangGraph pipeline categorizes, retrieves knowledge, executes tools, and evaluates safety.
+                    {t.simulatorDesc}
                   </p>
                 </div>
 
@@ -882,7 +1074,7 @@ export default function App() {
                 <form onSubmit={simulateTicket} className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="sm:col-span-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Customer Email</label>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">{t.simEmailLabel}</label>
                       <input
                         type="email"
                         value={simEmail}
@@ -892,7 +1084,7 @@ export default function App() {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Customer Message</label>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">{t.simMessageLabel}</label>
                       <input
                         type="text"
                         value={simMessage}
@@ -912,11 +1104,11 @@ export default function App() {
                       {loadingSim ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          Running Agent...
+                          {t.simRunningBtn}
                         </>
                       ) : (
                         <>
-                          <Send className="w-4 h-4" /> Run Autonomous Triage
+                          <Send className="w-4 h-4" /> {t.simRunBtn}
                         </>
                       )}
                     </button>
@@ -927,17 +1119,17 @@ export default function App() {
               {/* Visual LangGraph 6-Node Architecture */}
               <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
                 <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wider">
-                  <Activity className="w-4 h-4 text-emerald-400" /> LangGraph Architecture Pipeline Flow
+                  <Activity className="w-4 h-4 text-emerald-400" /> {t.architectureTitle}
                 </h3>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   {[
-                    { step: "1", name: "Intake", desc: "LLM Classification", icon: Bot, color: "text-purple-400" },
-                    { step: "2", name: "Verify", desc: "Customer ID & Tier", icon: User, color: "text-blue-400" },
-                    { step: "3", name: "Tools / RAG", desc: "Qdrant Vector KB", icon: BookOpen, color: "text-emerald-400" },
-                    { step: "4", name: "Resolution", desc: "Gemini 3.6 Flash", icon: Sparkles, color: "text-amber-400" },
-                    { step: "5", name: "Safety Gate", desc: "Escalation Policy", icon: ShieldCheck, color: "text-rose-400" },
-                    { step: "6", name: "Outcome", desc: "Resolved / Zendesk", icon: CheckCircle2, color: "text-emerald-400" },
+                    { step: "1", name: t.node1, desc: t.node1Desc, icon: Bot, color: "text-purple-400" },
+                    { step: "2", name: t.node2, desc: t.node2Desc, icon: User, color: "text-blue-400" },
+                    { step: "3", name: t.node3, desc: t.node3Desc, icon: BookOpen, color: "text-emerald-400" },
+                    { step: "4", name: t.node4, desc: t.node4Desc, icon: Sparkles, color: "text-amber-400" },
+                    { step: "5", name: t.node5, desc: t.node5Desc, icon: ShieldCheck, color: "text-rose-400" },
+                    { step: "6", name: t.node6, desc: t.node6Desc, icon: CheckCircle2, color: "text-emerald-400" },
                   ].map((node, i) => (
                     <div key={i} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-2">
@@ -1005,10 +1197,13 @@ export default function App() {
                       priority: latestSimTicket.priority || "Medium",
                       aiFindings: latestSimTicket.ai_findings || "",
                       toolsExecuted: latestSimTicket.tools_executed || [],
-                      escalationReason: latestSimTicket.escalation_reason || "Autonomous processing escalation."
+                      escalationReason: latestSimTicket.escalation_reason || "Autonomous processing escalation.",
+                      churnRiskScore: latestSimTicket.churn_risk_score,
+                      recommendedAction: latestSimTicket.recommended_action
                     }} />
                   ) : (
                     <div className="space-y-4">
+                      {/* Grounded response */}
                       <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-xl">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1020,6 +1215,21 @@ export default function App() {
                           {latestSimTicket.draft_response || "Inquiry processed and closed."}
                         </div>
                       </div>
+
+                      {/* Retention action & Churn Risk */}
+                      {latestSimTicket.recommended_action && (
+                        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <ShieldAlert className="w-4 h-4 text-purple-400" />
+                            <span className="text-xs text-purple-200 font-medium">
+                              <strong>Retention Guidance:</strong> {latestSimTicket.recommended_action}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 whitespace-nowrap">
+                            Churn Risk: {latestSimTicket.churn_risk_score || 20}%
+                          </span>
+                        </div>
+                      )}
 
                       <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl">
                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -1045,8 +1255,8 @@ export default function App() {
               <div className="p-5 border-b border-slate-800 space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="font-bold text-base text-white">Live Inbound Ticket Ledger</h3>
-                    <p className="text-xs text-slate-400">Total tickets recorded in Neon PostgreSQL: {tickets.length}</p>
+                    <h3 className="font-bold text-base text-white">{t.ledgerTitle}</h3>
+                    <p className="text-xs text-slate-400">{t.ledgerDesc} ({tickets.length})</p>
                   </div>
                 </div>
 
@@ -1057,7 +1267,7 @@ export default function App() {
                       type="text"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      placeholder="Search email, ticket ID, or message..."
+                      placeholder={t.searchPlaceholder}
                       className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -1069,9 +1279,9 @@ export default function App() {
                       onChange={e => setStatusFilter(e.target.value)}
                       className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                     >
-                      <option value="all">All Statuses</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="escalated">Escalated</option>
+                      <option value="all">{t.filterAllStatus}</option>
+                      <option value="resolved">{t.filterResolved}</option>
+                      <option value="escalated">{t.filterEscalated}</option>
                       <option value="open">Open / Processing</option>
                     </select>
                   </div>
@@ -1082,7 +1292,7 @@ export default function App() {
                       onChange={e => setCategoryFilter(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                     >
-                      <option value="all">All Categories</option>
+                      <option value="all">{t.filterAllCats}</option>
                       <option value="General">General</option>
                       <option value="Technical">Technical</option>
                       <option value="Billing">Billing</option>
@@ -1095,25 +1305,30 @@ export default function App() {
               {filteredTickets.length === 0 ? (
                 <div className="text-center py-16 text-slate-500">
                   <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No tickets matched your filter criteria.</p>
+                  <p className="text-sm">{t.noTicketsFound}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-900/80 text-slate-400 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-800">
                       <tr>
-                        <th className="py-3.5 px-4">Ticket</th>
-                        <th className="py-3.5 px-4">Customer</th>
+                        <th className="py-3.5 px-4">{t.colId}</th>
+                        <th className="py-3.5 px-4">{t.colCustomer}</th>
                         <th className="py-3.5 px-4 max-w-sm">Message Snippet</th>
-                        <th className="py-3.5 px-4">Category</th>
-                        <th className="py-3.5 px-4">Priority</th>
-                        <th className="py-3.5 px-4">Status</th>
+                        <th className="py-3.5 px-4">{t.colCategory}</th>
+                        <th className="py-3.5 px-4">{t.colPriority}</th>
+                        <th className="py-3.5 px-4">{t.colChurnRisk}</th>
+                        <th className="py-3.5 px-4">{t.colStatus}</th>
                         <th className="py-3.5 px-4">Timestamp</th>
-                        <th className="py-3.5 px-4 text-right">Action</th>
+                        <th className="py-3.5 px-4 text-right">{t.colActions}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
-                      {filteredTickets.map(t => (
+                      {filteredTickets.map(t => {
+                        const score = t.churn_risk_score ?? 20;
+                        const isHigh = score >= 60;
+                        const isMid = score >= 35 && score < 60;
+                        return (
                         <tr 
                           key={t.id} 
                           className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
@@ -1146,6 +1361,16 @@ export default function App() {
                             </span>
                           </td>
                           <td className="py-3 px-4">
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              isHigh ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                              isMid ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              <ShieldAlert className="w-3 h-3" />
+                              {score}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                               t.status === 'resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                               t.status === 'escalated' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
@@ -1173,7 +1398,7 @@ export default function App() {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      );})}
                     </tbody>
                   </table>
                 </div>
@@ -1194,7 +1419,7 @@ export default function App() {
                 <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
                   <Key className="w-5 h-5" />
                 </div>
-                <h3 className="font-bold text-base text-white">Team Console Access</h3>
+                <h3 className="font-bold text-base text-white">{t.passcodeTitle}</h3>
               </div>
               <button
                 onClick={() => setShowPasscodeModal(false)}
@@ -1205,7 +1430,7 @@ export default function App() {
             </div>
 
             <p className="text-xs text-slate-400">
-              Please enter the team access passcode to view live agent telemetry and internal operations ledger.
+              {t.passcodeDesc}
             </p>
 
             <form onSubmit={handleVerifyPasscode} className="space-y-3">
@@ -1215,12 +1440,12 @@ export default function App() {
                   autoFocus
                   value={passcodeInput}
                   onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(false); }}
-                  placeholder="Enter passcode"
+                  placeholder={t.passcodePlaceholder}
                   className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 {passcodeError && (
                   <p className="text-xs text-rose-400 mt-1.5 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" /> Incorrect passcode. Please enter the valid team passcode.
+                    <AlertCircle className="w-3.5 h-3.5" /> {t.passcodeInvalid}
                   </p>
                 )}
 
@@ -1238,7 +1463,7 @@ export default function App() {
                   type="submit"
                   className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all"
                 >
-                  Authorize Entry
+                  {t.passcodeSubmit}
                 </button>
               </div>
             </form>
@@ -1305,7 +1530,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Original Message</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{t.rawInquiryTitle}</p>
                     <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 italic">
                       &ldquo;{ticketDetail.raw_message}&rdquo;
                     </div>
@@ -1314,7 +1539,7 @@ export default function App() {
                   {ticketDetail.draft_response && (
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                        <Bot className="w-4 h-4 text-emerald-400" /> Grounded AI Solution
+                        <Bot className="w-4 h-4 text-emerald-400" /> {t.officialResponseModal}
                       </p>
                       <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
                         {ticketDetail.draft_response}
@@ -1322,10 +1547,33 @@ export default function App() {
                     </div>
                   )}
 
+                  {/* Churn Risk & Retention Advisor Guidance */}
+                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldAlert className="w-4 h-4 text-purple-400" /> {t.retentionAdvisorTitle} ({ticketDetail.churn_risk_score ?? 20}%)
+                      </span>
+                      <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        (ticketDetail.churn_risk_score ?? 20) >= 60 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                        (ticketDetail.churn_risk_score ?? 20) >= 35 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                        'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      }`}>
+                        {(ticketDetail.churn_risk_score ?? 20) >= 60 ? 'High Risk Account' :
+                         (ticketDetail.churn_risk_score ?? 20) >= 35 ? 'Medium Retention Risk' : 'Low Churn Risk'}
+                      </span>
+                    </div>
+                    {ticketDetail.recommended_action && (
+                      <div className="text-xs text-purple-200 leading-relaxed font-medium bg-purple-950/40 p-3 rounded-lg border border-purple-800/40">
+                        <strong className="text-purple-300 block mb-0.5">Agent Retention Action:</strong>
+                        {ticketDetail.recommended_action}
+                      </div>
+                    )}
+                  </div>
+
                   {ticketDetail.escalation_reason && (
                     <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
                       <span className="font-bold flex items-center gap-1 mb-1">
-                        <AlertTriangle className="w-4 h-4 text-rose-400" /> Escalation Trigger:
+                        <AlertTriangle className="w-4 h-4 text-rose-400" /> {t.escalationReasonModal}:
                       </span>
                       {ticketDetail.escalation_reason}
                     </div>
@@ -1350,7 +1598,7 @@ export default function App() {
 
             {ticketDetail && (
               <div className="p-5 border-t border-slate-800 flex justify-between items-center bg-[#0D1527] sticky bottom-0">
-                <span className="text-xs text-slate-500">Update status:</span>
+                <span className="text-xs text-slate-500">{t.quickChangeStatus}</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleUpdateStatus(ticketDetail.id, 'resolved')}

@@ -9,8 +9,16 @@ from agents.nodes import (
     escalation_node
 )
 
+def check_fast_escalation(state: TicketState) -> str:
+    """Fast-track critical or angry tickets directly to escalation, saving latency and quota."""
+    if state.get("priority") == "Critical":
+        return "escalate"
+    if state.get("sentiment") == "Angry":
+        return "escalate"
+    return "proceed"
+
 def route_after_gate(state: TicketState) -> str:
-    if state["is_safe"]:
+    if state.get("is_safe", False):
         return "resolve"
     return "escalate"
 
@@ -24,12 +32,18 @@ def build_graph():
     workflow.add_node("safety", safety_gate_node)
     workflow.add_node("escalation", escalation_node)
     
-    # Fake node for direct resolve end state
+    # Direct resolve end state
     workflow.add_node("resolve", lambda x: {"resolution_status": "resolved", "agent_trace": ["Ticket automatically resolved."]})
     
     workflow.add_edge(START, "intake")
     workflow.add_edge("intake", "verify")
-    workflow.add_edge("verify", "tools")
+    
+    # Conditional edge after verify: bypass RAG & resolution if already Critical / Angry
+    workflow.add_conditional_edges("verify", check_fast_escalation, {
+        "proceed": "tools",
+        "escalate": "escalation"
+    })
+    
     workflow.add_edge("tools", "resolution")
     workflow.add_edge("resolution", "safety")
     
