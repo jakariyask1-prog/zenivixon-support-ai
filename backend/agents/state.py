@@ -26,6 +26,8 @@ class TicketState(TypedDict):
     is_safe: bool
     resolution_status: str # 'open', 'resolved', 'escalated'
     escalation_reason: Optional[str]
+    churn_risk_score: Optional[int]
+    recommended_action: Optional[str]
     
     # Telemetry/Trace
     agent_trace: Annotated[Sequence[str], operator.add]

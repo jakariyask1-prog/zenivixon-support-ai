@@ -14,9 +14,6 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = "zenivixon_kb"
 VECTOR_SIZE = 3072  # models/gemini-embedding-001 output size
 
-if not GEMINI_API_KEY:
-    print("Error: GEMINI_API_KEY is not set.")
-    exit(1)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ZENIVIXON MASTER KNOWLEDGE BASE — 30 semantic chunks (RAG-ready)

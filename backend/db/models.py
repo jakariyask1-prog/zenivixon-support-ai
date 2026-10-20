@@ -9,8 +9,10 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     name = Column(String)
+    company = Column(String, default="Individual", nullable=True)
     tier = Column(String, default="standard") # standard, enterprise, pro
     is_active = Column(Boolean, default=True)
+    join_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
 
     tickets = relationship("Ticket", back_populates="customer")
     orders = relationship("Order", back_populates="customer")
@@ -76,6 +78,7 @@ class Ticket(Base):
     tools_executed = Column(Text, nullable=True) # JSON list of tools
     escalation_reason = Column(Text, nullable=True)
     recommended_action = Column(Text, nullable=True)
+    churn_risk_score = Column(Integer, default=25, nullable=True)
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     resolved_at = Column(DateTime, nullable=True)
