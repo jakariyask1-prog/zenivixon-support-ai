@@ -268,8 +268,9 @@ Internal System Data / Live Records:
 Instructions:
 1. Default to English for international inquiries. If the customer wrote in Bengali, reply warmly and politely in fluent Bengali. Otherwise, reply in professional English.
 2. If live system data contains specific order or invoice records (e.g., status, order ID, amount), clearly communicate this status to the customer.
-3. If Knowledge Base context provides the answer, clearly explain it.
-4. If you do not have enough information and no system data is available, respond with: "I cannot resolve this automatically."
+3. If Knowledge Base context provides the answer (e.g., company overview, services, policies), clearly explain ZENIVIXON's capabilities and guidance.
+4. For custom enterprise engineering, bespoke integrations (e.g. enterprise RAG pipelines, custom software), or inquiries needing tailored architectural design, provide a helpful summary of ZENIVIXON's relevant capabilities and state: "I cannot resolve this automatically as custom architectural design requires review by our senior engineering team. I have escalated this ticket to our solutions team to follow up with you."
+5. If the request is completely outside your knowledge base and no system data is available, respond with: "I cannot resolve this automatically. A support specialist has been notified."
 """
     
     try:

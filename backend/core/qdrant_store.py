@@ -19,16 +19,30 @@ COLLECTION_NAME = "zenivixon_kb"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 VECTOR_SIZE = 3072
 
+_cached_genai_client = None
+_cached_qdrant_client = None
+
+def get_genai_client():
+    global _cached_genai_client
+    if _cached_genai_client is None:
+        _cached_genai_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _cached_genai_client
+
 def _get_embedding(text: str) -> list:
-    """Get embedding vector using google-genai client (supports AQ.* keys)."""
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    """Get embedding vector using cached google-genai client (supports AQ.* keys)."""
+    client = get_genai_client()
     result = client.models.embed_content(model=EMBEDDING_MODEL, contents=text)
     return result.embeddings[0].values
 
 def get_qdrant_client():
+    global _cached_qdrant_client
+    if _cached_qdrant_client is not None:
+        return _cached_qdrant_client
     if QDRANT_API_KEY:
-        return QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=3.0, check_compatibility=False)
-    return QdrantClient(url=QDRANT_URL, timeout=3.0, check_compatibility=False)
+        _cached_qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=3.0, check_compatibility=False)
+    else:
+        _cached_qdrant_client = QdrantClient(url=QDRANT_URL, timeout=3.0, check_compatibility=False)
+    return _cached_qdrant_client
 
 def init_qdrant():
     client = get_qdrant_client()
