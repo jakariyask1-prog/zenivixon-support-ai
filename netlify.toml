@@ -1,5 +1,14 @@
 [build]
+  command = "npm --prefix frontend install && npm --prefix frontend run build"
   publish = "frontend/out"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
 # Disable Netlify feedback drawer / badge widget
 [context.deploy-preview]
@@ -10,3 +19,4 @@
 
 [context.production]
   drawer = false
+
