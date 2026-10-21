@@ -60,7 +60,8 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"), index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=True)
+    customer_email = Column(String, index=True, nullable=True)
     
     # User Input
     raw_message = Column(Text, nullable=False)

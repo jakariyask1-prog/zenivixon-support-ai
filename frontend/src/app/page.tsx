@@ -84,6 +84,9 @@ interface LatestTicketResponse {
   ticket_id: number;
   status: string;
   trace: string[];
+  customer_email?: string;
+  customer_name?: string;
+  customer_tier?: string;
   category?: string;
   intent?: string;
   priority?: string;
@@ -1251,9 +1254,9 @@ export default function App() {
                   {latestSimTicket.status === 'escalated' ? (
                     <HandoffPackage ticket={{
                       customer: { 
-                        email: simEmail, 
+                        email: latestSimTicket.customer_email || simEmail, 
                         isVerified: Boolean(latestSimTicket.is_verified), 
-                        tier: latestSimTicket.is_verified ? "standard" : "none" 
+                        tier: latestSimTicket.customer_tier || (latestSimTicket.is_verified ? "standard" : "standard") 
                       },
                       rawMessage: simMessage,
                       category: latestSimTicket.category || "General",

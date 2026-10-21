@@ -1,12 +1,16 @@
 from typing import Dict, Any, Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from db.database import SessionLocal
 from db.models import Customer, Order, Subscription, Invoice
 
 def get_customer(email: str) -> Optional[Dict[str, Any]]:
-    """Retrieve customer details by email."""
+    """Retrieve customer details by email (case-insensitive & trimmed)."""
+    if not email:
+        return None
+    clean = email.strip().lower()
     with SessionLocal() as db:
-        customer = db.query(Customer).filter(Customer.email == email).first()
+        customer = db.query(Customer).filter(func.lower(Customer.email) == clean).first()
         if customer:
             return {"id": customer.id, "name": customer.name, "tier": customer.tier, "is_active": customer.is_active}
         return None

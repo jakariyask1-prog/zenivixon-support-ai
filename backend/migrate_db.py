@@ -29,6 +29,7 @@ if "tickets" in tables:
     t_cols = [r[1] for r in cur.fetchall()]
     print(f"Ticket columns: {t_cols}")
     expected_cols = {
+        "customer_email": "TEXT",
         "raw_message": "TEXT",
         "category": "TEXT",
         "intent": "TEXT",

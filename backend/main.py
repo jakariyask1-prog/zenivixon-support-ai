@@ -122,12 +122,15 @@ class TicketRequest(BaseModel):
 
 @app.post("/api/tickets")
 def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
-    # 1. Create or retrieve customer in DB
-    customer = db.query(Customer).filter(Customer.email == req.email).first()
+    clean_email = req.email.strip().lower()
+    
+    # 1. Create or retrieve customer in DB (case-insensitive & trimmed)
+    customer = db.query(Customer).filter(func.lower(Customer.email) == clean_email).first()
     if not customer:
+        name_part = clean_email.split("@")[0].replace(".", " ").title() if "@" in clean_email else "Customer"
         customer = Customer(
-            email=req.email,
-            name=req.email.split("@")[0].replace(".", " ").title(),
+            email=clean_email,
+            name=name_part,
             company="General",
             tier="standard",
             is_active=True
@@ -138,6 +141,7 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
 
     ticket = Ticket(
         customer_id=customer.id,
+        customer_email=clean_email,
         raw_message=req.message,
         resolution_status="processing"
     )
@@ -148,9 +152,10 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
     # 2. Prepare LangGraph State
     initial_state = {
         "ticket_id": ticket.id,
-        "customer_email": req.email,
+        "customer_email": clean_email,
         "raw_message": req.message,
-        "is_verified": False,
+        "is_verified": True,
+        "customer_tier": customer.tier or "standard",
         "agent_trace": []
     }
     
@@ -183,6 +188,9 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
     
     return {
         "ticket_id": ticket.id,
+        "customer_email": clean_email,
+        "customer_name": customer.name,
+        "customer_tier": customer.tier,
         "status": ticket.resolution_status,
         "trace": final_state.get("agent_trace"),
         "category": final_state.get("category"),
@@ -195,7 +203,7 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
         "churn_risk_score": final_state.get("churn_risk_score", 20),
         "draft_response": final_state.get("draft_response"),
         "tools_executed": final_state.get("tool_outputs", []),
-        "is_verified": final_state.get("is_verified", False)
+        "is_verified": final_state.get("is_verified", True)
     }
 
 @app.get("/api/dashboard/stats")
@@ -327,8 +335,8 @@ def list_tickets(
     
     items = []
     for t in tickets:
-        customer_email = t.customer.email if t.customer else "Guest"
-        customer_tier = t.customer.tier if t.customer else "none"
+        customer_email = t.customer.email if t.customer else (t.customer_email or "Guest")
+        customer_tier = t.customer.tier if t.customer else "standard"
         items.append({
             "id": t.id,
             "customer_email": customer_email,
@@ -366,13 +374,18 @@ def get_ticket_detail(
         except:
             tools_parsed = []
             
+    email_val = ticket.customer.email if ticket.customer else (ticket.customer_email or "Guest")
+    name_val = ticket.customer.name if ticket.customer else (ticket.customer_email.split("@")[0].title() if ticket.customer_email and "@" in ticket.customer_email else "Customer")
+    tier_val = ticket.customer.tier if ticket.customer else "standard"
+    is_ver = bool(ticket.customer or ticket.customer_email)
+
     return {
         "id": ticket.id,
         "customer": {
-            "email": ticket.customer.email if ticket.customer else "Guest",
-            "name": ticket.customer.name if ticket.customer else "Guest",
-            "tier": ticket.customer.tier if ticket.customer else "none",
-            "is_verified": bool(ticket.customer)
+            "email": email_val,
+            "name": name_val,
+            "tier": tier_val,
+            "is_verified": is_ver
         },
         "raw_message": ticket.raw_message,
         "category": ticket.category or "General",
