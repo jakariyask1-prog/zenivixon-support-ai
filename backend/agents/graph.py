@@ -37,10 +37,12 @@ def build_graph():
     
     workflow.add_edge(START, "intake")
     workflow.add_edge("intake", "verify")
+    workflow.add_edge("verify", "tools")
     
-    # Conditional edge after verify: bypass RAG & resolution if already Critical / Angry
-    workflow.add_conditional_edges("verify", check_fast_escalation, {
-        "proceed": "tools",
+    # Conditional edge after tools: bypass LLM resolution draft if already Critical / Angry,
+    # but ensure customer order & invoice tools HAVE EXECUTED for Zendesk handoff!
+    workflow.add_conditional_edges("tools", check_fast_escalation, {
+        "proceed": "resolution",
         "escalate": "escalation"
     })
     

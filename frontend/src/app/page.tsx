@@ -161,12 +161,14 @@ export default function App() {
 
   // Track Ticket State
   const [trackInputId, setTrackInputId] = useState('');
+  const [trackEmail, setTrackEmail] = useState('');
   const [trackLoading, setTrackLoading] = useState(false);
   const [trackResult, setTrackResult] = useState<TicketDetailModalData | null>(null);
   const [trackError, setTrackError] = useState<string | null>(null);
 
   // Team Console Protection State
   const [isTeamAuthenticated, setIsTeamAuthenticated] = useState(false);
+  const [adminPasscode, setAdminPasscode] = useState<string>('zenivixon');
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
@@ -195,9 +197,12 @@ export default function App() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (pass?: string) => {
+    const code = pass || adminPasscode || 'zenivixon';
     try {
-      const res = await fetch(`${API_BASE}/api/dashboard/stats`);
+      const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
+        headers: { 'X-Admin-Passcode': code }
+      });
       if (res.ok) {
         const data: DashboardStats = await res.json();
         setStats(data);
@@ -205,12 +210,15 @@ export default function App() {
     } catch (e) {
       console.error("Failed to fetch stats", e);
     }
-  }, []);
+  }, [adminPasscode]);
 
-  const fetchTickets = useCallback(async () => {
+  const fetchTickets = useCallback(async (pass?: string) => {
+    const code = pass || adminPasscode || 'zenivixon';
     setRefreshingTickets(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets?limit=50`);
+      const res = await fetch(`${API_BASE}/api/tickets?limit=50`, {
+        headers: { 'X-Admin-Passcode': code }
+      });
       if (res.ok) {
         const data = await res.json();
         setTickets(data.tickets || []);
@@ -220,9 +228,19 @@ export default function App() {
     } finally {
       setRefreshingTickets(false);
     }
-  }, []);
+  }, [adminPasscode]);
 
   useEffect(() => {
+    try {
+      const savedPass = sessionStorage.getItem('zenivixon_admin_passcode');
+      if (savedPass) {
+        setAdminPasscode(savedPass);
+        setIsTeamAuthenticated(true);
+        fetchStats(savedPass);
+        fetchTickets(savedPass);
+        return;
+      }
+    } catch {}
     fetchStats();
     fetchTickets();
   }, [fetchStats, fetchTickets]);
@@ -256,12 +274,16 @@ export default function App() {
     }
   };
 
-  // Customer: Track Ticket
+  // Customer: Track Ticket (Secure ID + Email Verification)
   const handleCustomerTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanId = trackInputId.replace(/\D/g, '');
-    if (!cleanId) {
-      setTrackError("Please enter a valid numeric Ticket ID (e.g. 26 or #TKT-26).");
+    if (!cleanId || !trackEmail.trim()) {
+      setTrackError(
+        lang === 'bn' 
+          ? "অনুগ্রহ করে একটি সঠিক টিকেট নম্বর (যেমন: 26) এবং আপনার ইমেইল দিন।"
+          : "Please enter both your numeric Ticket ID (e.g. 26) and your customer email address."
+      );
       return;
     }
 
@@ -269,15 +291,25 @@ export default function App() {
     setTrackError(null);
     setTrackResult(null);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets/${cleanId}`);
+      const res = await fetch(`${API_BASE}/api/portal/track?ticket_id=${cleanId}&email=${encodeURIComponent(trackEmail.trim())}`);
       if (res.ok) {
         const data: TicketDetailModalData = await res.json();
         setTrackResult(data);
       } else {
-        setTrackError(`Ticket #${cleanId} was not found. Please check your ticket ID.`);
+        const errJson = await res.json().catch(() => ({}));
+        setTrackError(
+          errJson.detail || 
+          (lang === 'bn'
+            ? `টিকেট #${cleanId} এবং '${trackEmail}' ইমেইলের কোনো রেকর্ড পাওয়া যায়নি। অনুগ্রহ করে তথ্য মিলিয়ে দেখুন।`
+            : `Ticket #${cleanId} was not found for email '${trackEmail}'. Please verify your credentials.`)
+        );
       }
     } catch (err) {
-      setTrackError("Unable to reach support server. Please try again later.");
+      setTrackError(
+        lang === 'bn'
+          ? "সাপোর্ট সার্ভারে সংযোগ করা সম্ভব হয়নি। অনুগ্রহ করে কিছুক্ষণ পর চেষ্টা করুন।"
+          : "Unable to reach support server. Please try again later."
+      );
     } finally {
       setTrackLoading(false);
     }
@@ -302,10 +334,17 @@ export default function App() {
       'zenivixon',
       'zenivixon2026'
     ];
-    if (passcodeInput.trim() !== '' && validCodes.includes(passcodeInput.trim().toLowerCase())) {
+    const cleanPass = passcodeInput.trim();
+    if (cleanPass !== '' && validCodes.includes(cleanPass.toLowerCase())) {
       setIsTeamAuthenticated(true);
+      setAdminPasscode(cleanPass);
+      try {
+        sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
+      } catch {}
       setShowPasscodeModal(false);
       setViewMode('team');
+      fetchStats(cleanPass);
+      fetchTickets(cleanPass);
     } else {
       setPasscodeError(true);
     }
@@ -349,7 +388,9 @@ export default function App() {
     setSelectedTicketId(id);
     setLoadingDetail(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets/${id}`);
+      const res = await fetch(`${API_BASE}/api/tickets/${id}`, {
+        headers: { 'X-Admin-Passcode': adminPasscode || 'zenivixon' }
+      });
       if (res.ok) {
         const data: TicketDetailModalData = await res.json();
         setTicketDetail(data);
@@ -366,7 +407,10 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/api/tickets/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Passcode': adminPasscode || 'zenivixon'
+        },
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
@@ -689,23 +733,43 @@ export default function App() {
                 </p>
               </div>
 
-              <form onSubmit={handleCustomerTrack} className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  value={trackInputId}
-                  onChange={e => setTrackInputId(e.target.value)}
-                  placeholder={t.trackPlaceholder}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                />
-                <button
-                  type="submit"
-                  disabled={trackLoading}
-                  className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md transition-all flex items-center gap-2 shrink-0"
-                >
-                  {trackLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  {t.trackBtn}
-                </button>
+              <form onSubmit={handleCustomerTrack} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-4">
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    Ticket ID *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={trackInputId}
+                    onChange={e => setTrackInputId(e.target.value)}
+                    placeholder={t.trackPlaceholder}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    {t.trackEmailLabel} *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={trackEmail}
+                    onChange={e => setTrackEmail(e.target.value)}
+                    placeholder={t.trackEmailPlaceholder}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="sm:col-span-3 flex items-end">
+                  <button
+                    type="submit"
+                    disabled={trackLoading}
+                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                  >
+                    {trackLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span>{t.trackBtn}</span>
+                  </button>
+                </div>
               </form>
 
               {trackError && (

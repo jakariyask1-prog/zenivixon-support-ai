@@ -4,7 +4,6 @@ sqlalchemy
 psycopg2-binary
 langgraph
 langchain-google-genai
-langchain-openai
 langchain-core
 qdrant-client
 pydantic

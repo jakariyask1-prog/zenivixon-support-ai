@@ -60,19 +60,19 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"), index=True)
     
     # User Input
     raw_message = Column(Text, nullable=False)
     
     # Intake & Analysis
-    category = Column(String, nullable=True)
+    category = Column(String, nullable=True, index=True)
     intent = Column(String, nullable=True)
-    priority = Column(String, nullable=True)
+    priority = Column(String, nullable=True, index=True)
     sentiment = Column(String, nullable=True)
     
     # Handoff Package & Resolution
-    resolution_status = Column(String, default="open") # open, processing, resolved, escalated
+    resolution_status = Column(String, default="open", index=True) # open, processing, resolved, escalated
     draft_response = Column(Text, nullable=True)
     ai_findings = Column(Text, nullable=True)
     tools_executed = Column(Text, nullable=True) # JSON list of tools
@@ -80,7 +80,7 @@ class Ticket(Base):
     recommended_action = Column(Text, nullable=True)
     churn_risk_score = Column(Integer, default=25, nullable=True)
     
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     resolved_at = Column(DateTime, nullable=True)
 
     customer = relationship("Customer", back_populates="tickets")

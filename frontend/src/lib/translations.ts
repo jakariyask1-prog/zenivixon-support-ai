@@ -102,9 +102,11 @@ export const TRANSLATIONS = {
     
     // Customer Track
     trackTitle: "Track Existing Support Ticket",
-    trackDesc: "Enter your numeric Ticket ID (e.g. 26 or #TKT-26) to see live status, findings, and responses.",
+    trackDesc: "Enter your numeric Ticket ID (e.g. 26 or #TKT-26) and associated email to securely view live status, findings, and responses.",
     trackPlaceholder: "Enter Ticket ID (e.g. 26)",
-    trackBtn: "Track",
+    trackEmailLabel: "Customer Email Address",
+    trackEmailPlaceholder: "e.g. name@company.com",
+    trackBtn: "Track Ticket",
     yourMessage: "Your Submitted Message:",
     trackUnderReview: "This ticket is currently under review by our senior support engineers. We will update you via email soon.",
     categoryLabel: "Category:",
@@ -249,8 +251,10 @@ export const TRANSLATIONS = {
     
     // Customer Track
     trackTitle: "পূর্বের টিকেট স্ট্যাটাস ট্র্যাক করুন",
-    trackDesc: "লাইভ স্ট্যাটাস ও উত্তর দেখতে আপনার টিকেট নম্বর দিন (যেমন: ২৬ বা #TKT-26)।",
+    trackDesc: "লাইভ স্ট্যাটাস ও উত্তর নিরাপদে দেখতে আপনার টিকেট নম্বর (যেমন: ২৬ বা #TKT-26) এবং ইমেইল দিন।",
     trackPlaceholder: "টিকেট নম্বর দিন (যেমন: 26)",
+    trackEmailLabel: "কাস্টমার ইমেইল অ্যাড্রেস",
+    trackEmailPlaceholder: "যেমন: name@company.com",
     trackBtn: "ট্র্যাক করুন",
     yourMessage: "আপনার পাঠানো মেসেজ:",
     trackUnderReview: "এই টিকেটটি বর্তমানে আমাদের সিনিয়র সাপোর্ট ইঞ্জিনিয়ারদের পর্যালোচনায় রয়েছে। দ্রুত ইমেইলে আপডেট জানানো হবে।",

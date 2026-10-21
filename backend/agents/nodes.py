@@ -107,6 +107,8 @@ Respond with exactly this JSON structure:
     
     used_fallback = False
     try:
+        if not llm:
+            raise ValueError("LLM is not initialized (missing API key or client)")
         response = llm.invoke([HumanMessage(content=prompt)])
         raw_content = response.content
 
@@ -123,8 +125,8 @@ Respond with exactly this JSON structure:
         cleaned = raw_content.strip()
         cleaned = cleaned.replace("```json", "").replace("```", "").strip()
 
-        # Attempt to extract JSON object using regex (handles extra surrounding text)
-        match = re.search(r'\{.*?\}', cleaned, re.DOTALL)
+        # Attempt to extract JSON object using greedy regex (handles nested structures & extra text)
+        match = re.search(r'\{.*\}', cleaned, re.DOTALL)
         if match:
             cleaned = match.group(0)
 
@@ -271,6 +273,8 @@ Instructions:
 """
     
     try:
+        if not llm:
+            raise ValueError("LLM is not initialized (missing API key or client)")
         response = llm.invoke([HumanMessage(content=prompt)])
         raw_draft = response.content
         if isinstance(raw_draft, list):
@@ -404,6 +408,14 @@ def escalation_node(state: TicketState) -> dict:
         else:
             esc_reason = "Policy Escalation: Autonomous resolution deferred for specialist human handling."
 
+    findings = state.get('ai_findings')
+    if not findings:
+        tools = state.get('tool_outputs', [])
+        if tools:
+            findings = "Fast-track diagnostics: " + "; ".join([t.get('result', '') for t in tools])
+        else:
+            findings = "Fast-track escalation: direct routing to human agent."
+
     summary = f"""
     Intent: {state.get('intent', 'Unknown')}
     Priority: {state.get('priority', 'Unknown')}
@@ -411,7 +423,7 @@ def escalation_node(state: TicketState) -> dict:
     Verified: {state.get('is_verified', False)}
     Churn Risk: {churn_score}%
     Recommended Action: {rec_action}
-    Findings: {state.get('ai_findings', 'N/A')}
+    Findings: {findings}
     Escalation Reason: {esc_reason}
     """
     # Escalate ticket in Zendesk
@@ -424,6 +436,7 @@ def escalation_node(state: TicketState) -> dict:
     return {
         "resolution_status": "escalated",
         "escalation_reason": esc_reason,
+        "ai_findings": findings,
         "churn_risk_score": churn_score,
         "recommended_action": rec_action,
         "agent_trace": [

@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from datetime import datetime, timezone, timedelta
+from typing import Optional
 import json
 import os
 import pathlib
@@ -15,12 +17,35 @@ from agents.graph import zenivixon_agent
 
 app = FastAPI(title="ZENIVIXON Support API")
 
+# Configurable CORS
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Admin Passcode / Security Dependency
+ADMIN_PASSCODES = set(
+    p.strip().lower() 
+    for p in os.getenv(
+        "ADMIN_PASSCODES", 
+        "zenivixon admin pannel,zenivixon admin panel,zenivixon,zenivixon2026"
+    ).split(",")
+    if p.strip()
+)
+
+def require_admin_auth(x_admin_passcode: Optional[str] = Header(None, alias="X-Admin-Passcode")):
+    """Validate administrative team passcode from header."""
+    if not x_admin_passcode or x_admin_passcode.strip().lower() not in ADMIN_PASSCODES:
+        raise HTTPException(
+            status_code=401, 
+            detail="Unauthorized: Valid Team Console passcode required in X-Admin-Passcode header."
+        )
+    return True
 
 frontend_out = pathlib.Path(__file__).resolve().parent.parent / "frontend" / "out"
 if frontend_out.exists() and (frontend_out / "index.html").exists():
@@ -174,49 +199,59 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
     }
 
 @app.get("/api/dashboard/stats")
-def dashboard_stats(db: Session = Depends(get_db)):
-    from datetime import timedelta
+def dashboard_stats(
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin_auth)
+):
+    """Aggregated telemetry & KPI metrics for Team Console (Admin Only)."""
+    # 1. High-speed SQL count aggregations instead of in-memory load
+    total = db.query(func.count(Ticket.id)).scalar() or 0
     
-    # Fetch all tickets in a single fast query and aggregate in memory
-    all_tickets = db.query(Ticket).all()
+    status_rows = db.query(Ticket.resolution_status, func.count(Ticket.id)).group_by(Ticket.resolution_status).all()
+    status_map = dict(status_rows)
+    resolved = status_map.get("resolved", 0)
+    escalated = status_map.get("escalated", 0)
+    pending = status_map.get("open", 0) + status_map.get("processing", 0)
     
-    total = len(all_tickets)
-    resolved = sum(1 for t in all_tickets if t.resolution_status == "resolved")
-    escalated = sum(1 for t in all_tickets if t.resolution_status == "escalated")
-    pending = sum(1 for t in all_tickets if t.resolution_status in ["open", "processing"])
-    
-    # Category Breakdown
+    # 2. Category breakdown via SQL GROUP BY
+    cat_rows = db.query(Ticket.category, func.count(Ticket.id)).group_by(Ticket.category).all()
+    cat_map = dict(cat_rows)
     categories = ["Order", "Billing", "Technical", "Account", "Subscription", "General"]
-    cat_counts = {cat: sum(1 for t in all_tickets if t.category == cat) for cat in categories}
+    cat_counts = {cat: cat_map.get(cat, 0) for cat in categories}
     
-    # Priority Breakdown
+    # 3. Priority breakdown via SQL GROUP BY
+    prio_rows = db.query(Ticket.priority, func.count(Ticket.id)).group_by(Ticket.priority).all()
+    prio_map = dict(prio_rows)
     priorities = ["Critical", "High", "Medium", "Low"]
-    prio_counts = {p: sum(1 for t in all_tickets if t.priority == p) for p in priorities}
+    prio_counts = {p: prio_map.get(p, 0) for p in priorities}
     
-    # Average Churn Risk
-    churn_scores = [t.churn_risk_score for t in all_tickets if t.churn_risk_score is not None]
-    avg_churn = round(sum(churn_scores) / len(churn_scores), 1) if churn_scores else 22.5
+    # 4. Average Churn Risk via SQL AVG
+    avg_churn_score = db.query(func.avg(Ticket.churn_risk_score)).filter(Ticket.churn_risk_score.isnot(None)).scalar()
+    avg_churn = round(float(avg_churn_score), 1) if avg_churn_score is not None else 22.5
     
-    # 7-day trend computed in memory
+    # 5. 7-day trend bounded by timestamp filter
     now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    recent_tickets = db.query(Ticket.created_at, Ticket.resolution_status).filter(Ticket.created_at >= seven_days_ago).all()
+    
     daily_stats = []
     for i in range(6, -1, -1):
         day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
         
-        day_tickets = []
-        for t in all_tickets:
-            if t.created_at:
-                t_dt = t.created_at.replace(tzinfo=timezone.utc) if t.created_at.tzinfo is None else t.created_at
+        day_statuses = []
+        for t_created, t_status in recent_tickets:
+            if t_created:
+                t_dt = t_created.replace(tzinfo=timezone.utc) if t_created.tzinfo is None else t_created
                 if day_start <= t_dt < day_end:
-                    day_tickets.append(t)
+                    day_statuses.append(t_status)
         
         daily_stats.append({
             "day": day_start.strftime("%a"),
             "date": day_start.strftime("%b %d"),
-            "total": len(day_tickets),
-            "resolved": sum(1 for t in day_tickets if t.resolution_status == "resolved"),
-            "escalated": sum(1 for t in day_tickets if t.resolution_status == "escalated")
+            "total": len(day_statuses),
+            "resolved": sum(1 for s in day_statuses if s == "resolved"),
+            "escalated": sum(1 for s in day_statuses if s == "escalated")
         })
         
     return {
@@ -232,16 +267,56 @@ def dashboard_stats(db: Session = Depends(get_db)):
         "daily_trend": daily_stats
     }
 
+@app.get("/api/portal/track")
+def portal_track_ticket(
+    ticket_id: int = Query(..., description="Numeric Ticket ID"),
+    email: str = Query(..., description="Customer Email address"),
+    db: Session = Depends(get_db)
+):
+    """Secure, privacy-protected ticket tracking for Customer Portal verifying Ticket ID and Email."""
+    clean_email = email.strip().lower()
+    ticket = db.query(Ticket).options(joinedload(Ticket.customer)).join(Customer).filter(
+        Ticket.id == ticket_id,
+        Customer.email == clean_email
+    ).first()
+    
+    if not ticket:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Ticket #{ticket_id} was not found for email '{email}'. Please check your Ticket ID and Email."
+        )
+        
+    return {
+        "id": ticket.id,
+        "customer": {
+            "email": ticket.customer.email if ticket.customer else clean_email,
+            "name": ticket.customer.name if ticket.customer else "Customer",
+            "tier": ticket.customer.tier if ticket.customer else "standard",
+            "is_verified": bool(ticket.customer)
+        },
+        "raw_message": ticket.raw_message,
+        "category": ticket.category or "General",
+        "intent": ticket.intent or "Inquiry",
+        "priority": ticket.priority or "Medium",
+        "sentiment": ticket.sentiment or "Neutral",
+        "status": ticket.resolution_status,
+        "draft_response": ticket.draft_response,
+        "ai_findings": ticket.ai_findings,
+        "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+        "resolved_at": ticket.resolved_at.isoformat() if ticket.resolved_at else None
+    }
+
 @app.get("/api/tickets")
 def list_tickets(
     status: str = Query(None, description="Filter by status: open, resolved, escalated"),
     category: str = Query(None, description="Filter by category"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin_auth)
 ):
-    """List support tickets with customer info and status."""
-    query = db.query(Ticket).order_by(Ticket.created_at.desc())
+    """List support tickets with customer info and status (Admin Only, Eager-loaded)."""
+    query = db.query(Ticket).options(joinedload(Ticket.customer)).order_by(Ticket.created_at.desc())
     if status:
         query = query.filter(Ticket.resolution_status == status)
     if category:
@@ -274,9 +349,13 @@ def list_tickets(
     return {"total": total, "tickets": items}
 
 @app.get("/api/tickets/{ticket_id}")
-def get_ticket_detail(ticket_id: int, db: Session = Depends(get_db)):
-    """Retrieve full detail and agent trace for a single ticket."""
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+def get_ticket_detail(
+    ticket_id: int, 
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin_auth)
+):
+    """Retrieve full detail and agent trace for a single ticket (Admin Only)."""
+    ticket = db.query(Ticket).options(joinedload(Ticket.customer)).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
         
@@ -315,8 +394,13 @@ class TicketStatusUpdate(BaseModel):
     status: str
 
 @app.patch("/api/tickets/{ticket_id}")
-def update_ticket_status(ticket_id: int, body: TicketStatusUpdate, db: Session = Depends(get_db)):
-    """Update ticket resolution status."""
+def update_ticket_status(
+    ticket_id: int, 
+    body: TicketStatusUpdate, 
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin_auth)
+):
+    """Update ticket resolution status (Admin Only)."""
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")

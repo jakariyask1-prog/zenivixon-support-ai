@@ -28,15 +28,38 @@ if (-not $nodeCmd) {
 }
 
 # 3. Setup Backend Virtual Environment
-if (-not (Test-Path "backend\.venv")) {
-    Write-Host "`n[*] Creating backend virtual environment (.venv)..." -ForegroundColor Cyan
+$venvPython = "backend\.venv\Scripts\python.exe"
+$venvPip = "backend\.venv\Scripts\pip.exe"
+$venvValid = $false
+
+if (Test-Path $venvPython) {
+    try {
+        & $venvPython -c "import sys; sys.exit(0)" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $venvValid = $true
+        }
+    } catch {
+        $venvValid = $false
+    }
+}
+
+if (-not $venvValid) {
+    Write-Host "`n[*] Initializing backend virtual environment (.venv)..." -ForegroundColor Cyan
+    if (Test-Path "backend\.venv") {
+        Write-Host "[!] Stale or non-functional .venv detected. Rebuilding virtual environment..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force "backend\.venv" -ErrorAction SilentlyContinue
+    }
     python -m venv backend\.venv
+    if (-not (Test-Path $venvPython)) {
+        # Fallback to py launcher if default python was windows store stub
+        py -m venv backend\.venv
+    }
     Write-Host "[*] Installing backend dependencies..." -ForegroundColor Cyan
-    & "backend\.venv\Scripts\pip.exe" install --upgrade pip
-    & "backend\.venv\Scripts\pip.exe" install -r backend\requirements.txt
+    & $venvPip install --upgrade pip
+    & $venvPip install -r backend\requirements.txt
     Write-Host "[OK] Backend dependencies installed successfully!" -ForegroundColor Green
 } else {
-    Write-Host "[OK] Backend .venv is ready." -ForegroundColor Green
+    Write-Host "[OK] Backend .venv is healthy and ready." -ForegroundColor Green
 }
 
 # 4. Setup Frontend Dependencies

@@ -78,14 +78,19 @@ def _search_local_fallback(query: str, limit: int = 3):
     return scored_docs[:limit]
 
 import socket
+import time
 from urllib.parse import urlparse
 
 _qdrant_online = None
+_last_check_time = 0.0
+_CHECK_INTERVAL_SECONDS = 30.0
 
 def is_qdrant_online():
-    global _qdrant_online
-    if _qdrant_online is not None:
+    global _qdrant_online, _last_check_time
+    now = time.time()
+    if _qdrant_online is not None and (now - _last_check_time) < _CHECK_INTERVAL_SECONDS:
         return _qdrant_online
+    _last_check_time = now
     try:
         parsed = urlparse(QDRANT_URL)
         host = parsed.hostname or "localhost"
