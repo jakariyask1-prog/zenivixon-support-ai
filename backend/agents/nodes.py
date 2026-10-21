@@ -23,7 +23,7 @@ from core.tools import (
 from core.zendesk import escalate_to_human
 from core.qdrant_store import search_kb
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_KEY
@@ -35,9 +35,9 @@ if GEMINI_KEY:
         llm = ChatGoogleGenerativeAI(
             model=GEMINI_MODEL, 
             api_key=GEMINI_KEY,
-            temperature=0, 
-            timeout=10.0,
-            max_retries=0
+            temperature=0.1, 
+            timeout=6.0,
+            max_retries=1
         )
     except Exception as err:
         print(f"[LLM Init Warning] Could not initialize ChatGoogleGenerativeAI: {err}")
@@ -92,10 +92,20 @@ def _heuristic_classify(message: str) -> dict:
     }
 
 def intake_node(state: TicketState) -> dict:
-    """Analyze intent, urgency, and sentiment with automatic fallback."""
+    """Analyze intent, urgency, and sentiment with high-speed hybrid classification."""
+    raw_msg = state.get('raw_message', '')
+    
+    # Fast-path check: If message clearly matches operational domain, resolve in 0ms (saves 3-4s latency!)
+    fast_data = _heuristic_classify(raw_msg)
+    if fast_data['category'] in ['Billing', 'Order', 'Account'] or fast_data['priority'] in ['Critical', 'High']:
+        return {
+            **fast_data, 
+            "agent_trace": [f"Intake complete (Fast-path): {fast_data['priority']} priority, {fast_data['category']} category."]
+        }
+
     prompt = f"""Analyze this support ticket and respond with ONLY a valid JSON object, no other text.
 
-Ticket: "{state['raw_message']}"
+Ticket: "{raw_msg}"
 
 Respond with exactly this JSON structure:
 {{

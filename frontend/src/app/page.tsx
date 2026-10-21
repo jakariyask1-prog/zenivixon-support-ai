@@ -160,6 +160,7 @@ export default function App() {
   const [custEmail, setCustEmail] = useState('');
   const [custMessage, setCustMessage] = useState('');
   const [custSubmitting, setCustSubmitting] = useState(false);
+  const [submitProgressStep, setSubmitProgressStep] = useState<number>(1);
   const [custSubmissionResult, setCustSubmissionResult] = useState<LatestTicketResponse | null>(null);
 
   // Track Ticket State
@@ -254,7 +255,13 @@ export default function App() {
     if (!custEmail.trim() || !custMessage.trim()) return;
 
     setCustSubmitting(true);
+    setSubmitProgressStep(1);
     setCustSubmissionResult(null);
+
+    const stepTimer = setInterval(() => {
+      setSubmitProgressStep(prev => (prev < 4 ? prev + 1 : prev));
+    }, 1100);
+
     try {
       const res = await fetch(`${API_BASE}/api/tickets`, {
         method: 'POST',
@@ -273,6 +280,7 @@ export default function App() {
     } catch (err) {
       console.error("Customer ticket submission failed:", err);
     } finally {
+      clearInterval(stepTimer);
       setCustSubmitting(false);
     }
   };
@@ -629,6 +637,36 @@ export default function App() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Live Progressive Stepper during AI Analysis */}
+                  {custSubmitting && (
+                    <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 space-y-3 shadow-inner">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-blue-300">
+                        <span className="flex items-center gap-2">
+                          <Bot className="w-4 h-4 text-blue-400 animate-pulse" />
+                          <span>{lang === 'bn' ? "মাল্টি-এজেন্ট প্রসেসিং চলছে..." : "Autonomous Multi-Agent Processing..."}</span>
+                        </span>
+                        <span className="text-[11px] font-mono text-blue-300 bg-blue-900/50 px-2.5 py-0.5 rounded-full border border-blue-700/50">
+                          {submitProgressStep === 1 && (lang === 'bn' ? "ধাপ ১/৪: ইনটেন্ট ও প্রায়োরিটি অ্যানালাইসিস..." : "Step 1/4: Analyzing intent & priority...")}
+                          {submitProgressStep === 2 && (lang === 'bn' ? "ধাপ ২/৪: ৩০-চাংক নলেজ বেস ও সিস্টেম ডাটা সার্চ..." : "Step 2/4: Scanning 30-chunk KB & systems...")}
+                          {submitProgressStep === 3 && (lang === 'bn' ? "ধাপ ৩/৪: জেমিনাই দিয়ে নির্ভুল উত্তর তৈরি..." : "Step 3/4: Drafting grounded solution...")}
+                          {submitProgressStep >= 4 && (lang === 'bn' ? "ধাপ ৪/৪: পলিসি সেফটি গেট ভেরিফিকেশন..." : "Step 4/4: Evaluating safety gate...")}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-1.5 rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${Math.min(submitProgressStep * 25, 96)}%` }}
+                        />
+                      </div>
+                      <p className="text-[11px] text-slate-400 italic">
+                        {lang === 'bn'
+                          ? "আমাদের এআই সিস্টেম আপনার অনুরোধটি অভ্যন্তরীণ নলেজ বেসের সাথে মিলিয়ে নির্ভুল উত্তর প্রস্তুত করছে। অনুগ্রহ করে কয়েক সেকেন্ড অপেক্ষা করুন।"
+                          : "Our autonomous AI engine is cross-checking internal systems and knowledge base to deliver a verified, grounded answer. Please allow a few seconds."
+                        }
+                      </p>
+                    </div>
+                  )}
 
                   <div className="pt-2 flex justify-end">
                     <button
