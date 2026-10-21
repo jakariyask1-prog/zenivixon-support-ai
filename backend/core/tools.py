@@ -23,18 +23,24 @@ def get_subscription(customer_id: int) -> Optional[Dict[str, Any]]:
             return {"plan_name": sub.plan_name, "status": sub.status, "monthly_rate": sub.monthly_rate}
         return None
 
-def get_order(order_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieve details for a specific order."""
+def get_order(order_id: str, customer_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    """Retrieve details for a specific order with tenant ownership validation."""
     with SessionLocal() as db:
-        order = db.query(Order).filter(Order.id == order_id).first()
+        query = db.query(Order).filter(Order.id == order_id)
+        if customer_id is not None:
+            query = query.filter(Order.customer_id == customer_id)
+        order = query.first()
         if order:
             return {"status": order.status, "total_amount": order.total_amount, "created_at": order.created_at.isoformat()}
         return None
 
-def get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieve details for a specific invoice."""
+def get_invoice(invoice_id: str, customer_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    """Retrieve details for a specific invoice with tenant ownership validation."""
     with SessionLocal() as db:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        query = db.query(Invoice).filter(Invoice.id == invoice_id)
+        if customer_id is not None:
+            query = query.filter(Invoice.customer_id == customer_id)
+        invoice = query.first()
         if invoice:
             return {"amount": invoice.amount, "status": invoice.status, "due_date": invoice.due_date.isoformat() if invoice.due_date else None}
         return None

@@ -23,7 +23,7 @@ from core.tools import (
 from core.zendesk import escalate_to_human
 from core.qdrant_store import search_kb
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_KEY
@@ -36,7 +36,7 @@ if GEMINI_KEY:
             model=GEMINI_MODEL, 
             api_key=GEMINI_KEY,
             temperature=0.1, 
-            timeout=6.0,
+            timeout=15.0,
             max_retries=1
         )
     except Exception as err:
@@ -92,20 +92,20 @@ def _heuristic_classify(message: str) -> dict:
     }
 
 def intake_node(state: TicketState) -> dict:
-    """Analyze intent, urgency, and sentiment with high-speed hybrid classification."""
+    """Analyze intent, urgency, and sentiment with hybrid classification."""
     raw_msg = state.get('raw_message', '')
     
-    # Fast-path check: If message clearly matches operational domain, resolve in 0ms (saves 3-4s latency!)
-    fast_data = _heuristic_classify(raw_msg)
-    if fast_data['category'] in ['Billing', 'Order', 'Account'] or fast_data['priority'] in ['Critical', 'High']:
+    # Fast-path check: If LLM is not initialized, immediately use heuristic
+    if not llm:
+        fast_data = _heuristic_classify(raw_msg)
         return {
             **fast_data, 
-            "agent_trace": [f"Intake complete (Fast-path): {fast_data['priority']} priority, {fast_data['category']} category."]
+            "agent_trace": [f"Intake complete (Fast-path/Fallback): {fast_data['priority']} priority, {fast_data['category']} category."]
         }
 
     prompt = f"""Analyze this support ticket and respond with ONLY a valid JSON object, no other text.
 
-Ticket: "{raw_msg}"
+Ticket: {json.dumps(raw_msg)}
 
 Respond with exactly this JSON structure:
 {{
@@ -163,19 +163,20 @@ def verify_node(state: TicketState) -> dict:
     """Verify customer identity via DB."""
     email = (state.get('customer_email') or '').strip()
     customer = get_customer(email)
-    if customer:
+    # A customer is only verified if already registered and marked active in DB
+    if customer and customer.get("is_active", True):
         return {
             "customer_id": customer["id"], 
             "customer_tier": customer.get("tier", "standard"),
             "is_verified": True,
             "agent_trace": [f"Customer verified: ID {customer['id']}, Tier {customer.get('tier', 'standard')} ({customer.get('name', 'Customer')})."]
         }
-    is_valid_email = bool(email and "@" in email)
+    cust_id = customer["id"] if customer else None
     return {
-        "customer_id": None, 
+        "customer_id": cust_id, 
         "customer_tier": "standard",
-        "is_verified": is_valid_email,
-        "agent_trace": [f"Customer email recorded: {email}."]
+        "is_verified": False,
+        "agent_trace": [f"Unverified customer ticket recorded: {email}."]
     }
 
 def tool_execution_node(state: TicketState) -> dict:
@@ -196,7 +197,7 @@ def tool_execution_node(state: TicketState) -> dict:
     matched_orders = set([m.upper() for m in order_id_matches])
     
     for oid in matched_orders:
-        order_info = get_order(oid)
+        order_info = get_order(oid, customer_id=cust_id)
         if order_info:
             desc = f"Order {oid}: Status={order_info['status']}, Total=${order_info['total_amount']}, Placed={order_info['created_at'][:10]}"
             tools_used.append({
@@ -224,7 +225,7 @@ def tool_execution_node(state: TicketState) -> dict:
     matched_invoices = set([m.upper() for m in invoice_id_matches])
     
     for iid in matched_invoices:
-        inv_info = get_invoice(iid)
+        inv_info = get_invoice(iid, customer_id=cust_id)
         if inv_info:
             desc = f"Invoice {iid}: Status={inv_info['status']}, Amount=${inv_info['amount']}, Due={inv_info.get('due_date', 'N/A')}"
             tools_used.append({
@@ -393,7 +394,7 @@ def safety_gate_node(state: TicketState) -> dict:
     elif not state.get('is_verified', False) and state.get('category') in ['Billing', 'Account', 'Security']:
         is_safe = False
         reason = "Deterministic Rule: Unverified user asking for sensitive category."
-    elif "I cannot resolve this" in state.get('draft_response', ''):
+    elif "I cannot resolve this" in (state.get('draft_response') or ''):
         is_safe = False
         reason = "AI Rule: Insufficient context to resolve."
         

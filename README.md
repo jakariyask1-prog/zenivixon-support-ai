@@ -161,7 +161,7 @@ npm run dev
 The project includes a 22-point end-to-end integration test suite verifying all database tools, vector RAG retrieval, multilingual heuristic classification, churn risk calculation, LangGraph nodes, auto-resolve flows, fast-track escalation, and all REST endpoints:
 
 ```powershell
-backend\.venv\Scripts\python.exe C:\Users\pc\.gemini\antigravity\brain\8fa82567-ca85-43d8-a394-2357bad2ac45\scratch\test_all_systems.py
+python backend/test_all_fixes.py
 ```
 
 **Test Results: 22/22 Tests Passed (100%)**

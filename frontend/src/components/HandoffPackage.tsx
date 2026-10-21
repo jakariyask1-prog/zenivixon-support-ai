@@ -35,7 +35,7 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
   const isCritical = ticket.priority.toLowerCase() === 'critical';
   
   let churnRiskScore = ticket.churnRiskScore ?? 35;
-  if (!ticket.churnRiskScore) {
+  if (ticket.churnRiskScore === undefined || ticket.churnRiskScore === null) {
     if (isCritical) churnRiskScore += 40;
     if (isEnterprise) churnRiskScore += 15;
     if (ticket.escalationReason.toLowerCase().includes('angry')) churnRiskScore += 10;

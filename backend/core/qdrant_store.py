@@ -57,7 +57,12 @@ def init_qdrant():
 def _search_local_fallback(query: str, limit: int = 3):
     """Zero-downtime fallback: searches the master knowledge base in-memory when Qdrant Cloud is unreachable."""
     try:
-        from ingest_kb import documents
+        try:
+            from ingest_kb import documents
+        except ImportError:
+            import sys, pathlib
+            sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+            from ingest_kb import documents
     except Exception:
         return []
 

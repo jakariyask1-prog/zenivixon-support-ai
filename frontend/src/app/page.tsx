@@ -124,7 +124,7 @@ interface TicketDetailModalData {
   resolved_at: string | null;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 export default function App() {
   // Global Language State: English ('en') is default
@@ -172,7 +172,7 @@ export default function App() {
 
   // Team Console Protection State
   const [isTeamAuthenticated, setIsTeamAuthenticated] = useState(false);
-  const [adminPasscode, setAdminPasscode] = useState<string>('zenivixon');
+  const [adminPasscode, setAdminPasscode] = useState<string>('');
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
@@ -202,7 +202,8 @@ export default function App() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const fetchStats = useCallback(async (pass?: string) => {
-    const code = pass || adminPasscode || 'zenivixon';
+    const code = pass || adminPasscode;
+    if (!code) return;
     try {
       const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
         headers: { 'X-Admin-Passcode': code }
@@ -217,7 +218,8 @@ export default function App() {
   }, [adminPasscode]);
 
   const fetchTickets = useCallback(async (pass?: string) => {
-    const code = pass || adminPasscode || 'zenivixon';
+    const code = pass || adminPasscode;
+    if (!code) return;
     setRefreshingTickets(true);
     try {
       const res = await fetch(`${API_BASE}/api/tickets?limit=50`, {
@@ -242,11 +244,8 @@ export default function App() {
         setIsTeamAuthenticated(true);
         fetchStats(savedPass);
         fetchTickets(savedPass);
-        return;
       }
     } catch {}
-    fetchStats();
-    fetchTickets();
   }, [fetchStats, fetchTickets]);
 
   // Customer: Submit Ticket
@@ -308,8 +307,17 @@ export default function App() {
         setTrackResult(data);
       } else {
         const errJson = await res.json().catch(() => ({}));
+        let errDetailMsg: string | null = null;
+        if (typeof errJson.detail === 'string') {
+          errDetailMsg = errJson.detail;
+        } else if (Array.isArray(errJson.detail)) {
+          errDetailMsg = errJson.detail.map((e: any) => e.msg || 'Invalid field').join(', ');
+        } else if (errJson.detail && typeof errJson.detail === 'object') {
+          errDetailMsg = JSON.stringify(errJson.detail);
+        }
+
         setTrackError(
-          errJson.detail || 
+          errDetailMsg || 
           (lang === 'bn'
             ? `টিকেট #${cleanId} এবং '${trackEmail}' ইমেইলের কোনো রেকর্ড পাওয়া যায়নি। অনুগ্রহ করে তথ্য মিলিয়ে দেখুন।`
             : `Ticket #${cleanId} was not found for email '${trackEmail}'. Please verify your credentials.`)
@@ -337,26 +345,32 @@ export default function App() {
     }
   };
 
-  const handleVerifyPasscode = (e: React.FormEvent) => {
+  const handleVerifyPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validCodes = [
-      'zenivixon admin pannel',
-      'zenivixon admin panel',
-      'zenivixon',
-      'zenivixon2026'
-    ];
     const cleanPass = passcodeInput.trim();
-    if (cleanPass !== '' && validCodes.includes(cleanPass.toLowerCase())) {
-      setIsTeamAuthenticated(true);
-      setAdminPasscode(cleanPass);
-      try {
-        sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
-      } catch {}
-      setShowPasscodeModal(false);
-      setViewMode('team');
-      fetchStats(cleanPass);
-      fetchTickets(cleanPass);
-    } else {
+    if (!cleanPass) {
+      setPasscodeError(true);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
+        headers: { 'X-Admin-Passcode': cleanPass }
+      });
+      if (res.ok) {
+        setIsTeamAuthenticated(true);
+        setAdminPasscode(cleanPass);
+        try {
+          sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
+        } catch {}
+        setShowPasscodeModal(false);
+        setViewMode('team');
+        const data = await res.json();
+        setStats(data);
+        fetchTickets(cleanPass);
+      } else {
+        setPasscodeError(true);
+      }
+    } catch {
       setPasscodeError(true);
     }
   };
@@ -1139,11 +1153,10 @@ export default function App() {
                         { name: "Subscription", key: "Subscription", color: "bg-indigo-500" },
                         { name: "General Inquiry", key: "General", color: "bg-emerald-500" }
                       ].map((cat, idx) => {
-                        const count = stats?.category_breakdown?.[cat.key] || 
-                          tickets.filter(t => t.category === cat.key).length || 
-                          (idx === 0 ? 3 : idx === 1 ? 2 : idx === 2 ? 1 : 1);
-                        const total = stats?.['Tickets Today'] || tickets.length || 7;
-                        const pct = Math.min(100, Math.round((count / (total || 1)) * 100));
+                        const count = stats?.category_breakdown?.[cat.key] ?? 
+                          tickets.filter(t => t.category === cat.key).length;
+                        const total = stats?.['Tickets Today'] ?? tickets.length;
+                        const pct = total > 0 ? Math.min(100, Math.round((count / total) * 100)) : 0;
                         return (
                           <div key={idx} className="space-y-1.5">
                             <div className="flex justify-between text-xs font-semibold">
@@ -1336,7 +1349,7 @@ export default function App() {
                       customer: { 
                         email: latestSimTicket.customer_email || simEmail, 
                         isVerified: Boolean(latestSimTicket.is_verified), 
-                        tier: latestSimTicket.customer_tier || (latestSimTicket.is_verified ? "standard" : "standard") 
+                        tier: latestSimTicket.customer_tier || "standard" 
                       },
                       rawMessage: simMessage,
                       category: latestSimTicket.category || "General",
@@ -1440,10 +1453,12 @@ export default function App() {
                       className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                     >
                       <option value="all">{t.filterAllCats}</option>
-                      <option value="General">General</option>
-                      <option value="Technical">Technical</option>
+                      <option value="Order">Order</option>
                       <option value="Billing">Billing</option>
-                      <option value="Product">Product</option>
+                      <option value="Technical">Technical</option>
+                      <option value="Account">Account</option>
+                      <option value="Subscription">Subscription</option>
+                      <option value="General">General</option>
                     </select>
                   </div>
                 </div>

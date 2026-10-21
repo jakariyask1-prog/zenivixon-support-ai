@@ -83,3 +83,17 @@
     linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
+
+/* Hide Netlify Drawer, Feedback Widget, and Injected Badges */
+iframe#netlify-drawer,
+#netlify-drawer,
+[data-netlify-drawer],
+netlify-drawer,
+.netlify-badge,
+div[class*="netlify-drawer"],
+div[id*="netlify-drawer"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

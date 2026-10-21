@@ -9,12 +9,25 @@ Write-Host "==========================================" -ForegroundColor Cyan
 
 # 1. Check Python
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd -or $pythonCmd.Source -like "*WindowsApps*") {
+$pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+
+$hasPython = $false
+$pythonExe = "python"
+
+if ($pyLauncher) {
+    $hasPython = $true
+    $pythonExe = "py"
+    Write-Host "[OK] Python launcher detected via py" -ForegroundColor Green
+} elseif ($pythonCmd -and $pythonCmd.Source -notlike "*WindowsApps*") {
+    $hasPython = $true
+    $pythonExe = "python"
+    Write-Host "[OK] Python detected: $($pythonCmd.Source)" -ForegroundColor Green
+}
+
+if (-not $hasPython) {
     Write-Host "[!] Python is not installed. Installing Python 3.11 via winget..." -ForegroundColor Yellow
     winget install --id Python.Python.3.11 -s winget --silent --accept-package-agreements --accept-source-agreements
     Write-Host "[+] Python installation completed. Please restart your PowerShell terminal if python is not immediately recognized." -ForegroundColor Green
-} else {
-    Write-Host "[OK] Python detected: $($pythonCmd.Source)" -ForegroundColor Green
 }
 
 # 2. Check Node.js
@@ -49,7 +62,11 @@ if (-not $venvValid) {
         Write-Host "[!] Stale or non-functional .venv detected. Rebuilding virtual environment..." -ForegroundColor Yellow
         Remove-Item -Recurse -Force "backend\.venv" -ErrorAction SilentlyContinue
     }
-    python -m venv backend\.venv
+    if ($pythonExe -eq "py") {
+        py -m venv backend\.venv
+    } else {
+        python -m venv backend\.venv
+    }
     if (-not (Test-Path $venvPython)) {
         # Fallback to py launcher if default python was windows store stub
         py -m venv backend\.venv

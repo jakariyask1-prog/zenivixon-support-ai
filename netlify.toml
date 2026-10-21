@@ -1,0 +1,12 @@
+[build]
+  publish = "frontend/out"
+
+# Disable Netlify feedback drawer / badge widget
+[context.deploy-preview]
+  drawer = false
+
+[context.branch-deploy]
+  drawer = false
+
+[context.production]
+  drawer = false

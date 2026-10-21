@@ -46,7 +46,6 @@ def build_graph():
         "escalate": "escalation"
     })
     
-    workflow.add_edge("tools", "resolution")
     workflow.add_edge("resolution", "safety")
     
     workflow.add_conditional_edges("safety", route_after_gate, {

@@ -125,19 +125,23 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
     clean_email = req.email.strip().lower()
     
     # 1. Create or retrieve customer in DB (case-insensitive & trimmed)
-    customer = db.query(Customer).filter(func.lower(Customer.email) == clean_email).first()
-    if not customer:
+    existing_customer = db.query(Customer).filter(func.lower(Customer.email) == clean_email).first()
+    is_verified_user = bool(existing_customer and existing_customer.is_active)
+    
+    if not existing_customer:
         name_part = clean_email.split("@")[0].replace(".", " ").title() if "@" in clean_email else "Customer"
         customer = Customer(
             email=clean_email,
             name=name_part,
             company="General",
             tier="standard",
-            is_active=True
+            is_active=False  # Guest / unverified submission until confirmed
         )
         db.add(customer)
         db.commit()
         db.refresh(customer)
+    else:
+        customer = existing_customer
 
     ticket = Ticket(
         customer_id=customer.id,
@@ -154,7 +158,7 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
         "ticket_id": ticket.id,
         "customer_email": clean_email,
         "raw_message": req.message,
-        "is_verified": True,
+        "is_verified": is_verified_user,
         "customer_tier": customer.tier or "standard",
         "agent_trace": []
     }
@@ -166,8 +170,8 @@ def submit_ticket(req: TicketRequest, db: Session = Depends(get_db)):
         print(f"Agent execution failed: {e}")
         final_state = initial_state.copy()
         final_state["resolution_status"] = "escalated"
-        final_state["escalation_reason"] = f"System Error: Autonomous processing failed."
-        final_state["agent_trace"].append(f"System Error: {str(e)}")
+        final_state["escalation_reason"] = "System Policy: Autonomous triage deferred to human engineering."
+        final_state["agent_trace"].append("Autonomous triage deferred to senior engineer.")
     
     # 4. Save results to DB
     ticket.category = final_state.get("category")
@@ -285,7 +289,7 @@ def portal_track_ticket(
     clean_email = email.strip().lower()
     ticket = db.query(Ticket).options(joinedload(Ticket.customer)).join(Customer).filter(
         Ticket.id == ticket_id,
-        Customer.email == clean_email
+        func.lower(Customer.email) == clean_email
     ).first()
     
     if not ticket:
@@ -406,6 +410,8 @@ def get_ticket_detail(
 class TicketStatusUpdate(BaseModel):
     status: str
 
+ALLOWED_STATUSES = {"open", "processing", "resolved", "escalated"}
+
 @app.patch("/api/tickets/{ticket_id}")
 def update_ticket_status(
     ticket_id: int, 
@@ -414,13 +420,23 @@ def update_ticket_status(
     _: bool = Depends(require_admin_auth)
 ):
     """Update ticket resolution status (Admin Only)."""
+    clean_status = body.status.strip().lower()
+    if clean_status not in ALLOWED_STATUSES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid status '{body.status}'. Must be one of: {', '.join(sorted(ALLOWED_STATUSES))}"
+        )
+
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
         
-    ticket.resolution_status = body.status
-    if body.status == "resolved":
+    ticket.resolution_status = clean_status
+    if clean_status == "resolved":
         ticket.resolved_at = datetime.now(timezone.utc)
+    else:
+        ticket.resolved_at = None
+        
     db.commit()
     return {"message": "Status updated", "ticket_id": ticket.id, "status": ticket.resolution_status}
 
