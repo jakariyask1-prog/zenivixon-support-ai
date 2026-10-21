@@ -449,25 +449,36 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
       
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          AMBIENT BACKGROUND LIGHTING & GRID PATTERN
+          ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="fixed inset-0 bg-grid-pattern pointer-events-none opacity-25 z-0" />
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-blue-600/15 via-indigo-600/8 to-transparent blur-3xl pointer-events-none z-0" />
+      <div className="fixed -bottom-40 right-10 w-[500px] h-[350px] bg-purple-600/10 blur-3xl pointer-events-none z-0" />
+
       {/* ─────────────────────────────────────────────────────────────────────────────
           GLOBAL TOP NAVIGATION & PORTAL SWITCHER
           ───────────────────────────────────────────────────────────────────────────── */}
-      <header className="border-b border-slate-800/80 bg-[#0B1120]/95 backdrop-blur-md px-4 sm:px-8 py-3.5 sticky top-0 z-40 shadow-sm">
+      <header className="border-b border-white/[0.08] bg-slate-950/80 backdrop-blur-xl px-4 sm:px-8 py-3 sticky top-0 z-40 shadow-[0_4px_30px_rgba(0,0,0,0.4)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
           {/* Logo & Brand Identity */}
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-              <Layers className="text-white w-5 h-5" />
+            <div className="relative group">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 rounded-2xl blur-sm opacity-60 group-hover:opacity-90 transition duration-300" />
+              <div className="relative h-10 w-10 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center shrink-0">
+                <Layers className="text-cyan-400 w-5 h-5" />
+              </div>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-blue-400 via-indigo-300 to-white bg-clip-text text-transparent">
+                <span className="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-white via-slate-100 to-blue-300 bg-clip-text text-transparent">
                   ZENIVIXON
                 </span>
-                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/10 text-cyan-300 border border-blue-500/30 tracking-wide uppercase shadow-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
                   {t.supportAi}
                 </span>
               </div>
@@ -480,13 +491,13 @@ export default function App() {
           {/* Portal Switcher & Language Toggle */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Language Selector: English Default (en) / Bengali (bn) */}
-            <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-xl p-0.5 shadow-inner">
+            <div className="flex items-center bg-slate-900/90 border border-white/10 rounded-xl p-0.5 shadow-inner backdrop-blur-md">
               <button
                 type="button"
                 onClick={() => handleLanguageChange('en')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 ${
                   lang === 'en'
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
                 title="English (Default)"
@@ -497,9 +508,9 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleLanguageChange('bn')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all ${
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all duration-200 ${
                   lang === 'bn'
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
                 title="বাংলা (Bengali)"
@@ -508,29 +519,31 @@ export default function App() {
               </button>
             </div>
 
-            <button
-              onClick={() => setViewMode('customer')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                viewMode === 'customer'
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              {t.customerPortal}
-            </button>
+            <div className="flex items-center bg-slate-900/80 border border-white/10 rounded-xl p-0.5 shadow-inner backdrop-blur-md">
+              <button
+                onClick={() => setViewMode('customer')}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                  viewMode === 'customer'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>{t.customerPortal}</span>
+              </button>
 
-            <button
-              onClick={handleTeamAccessClick}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                viewMode === 'team'
-                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20'
-                  : 'bg-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-700/80 border border-slate-700/60'
-              }`}
-            >
-              {isTeamAuthenticated ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
-              {t.teamConsole}
-            </button>
+              <button
+                onClick={handleTeamAccessClick}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                  viewMode === 'team'
+                    ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-md shadow-purple-500/25'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                {isTeamAuthenticated ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{t.teamConsole}</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -539,14 +552,20 @@ export default function App() {
           MODE 1: PUBLIC CUSTOMER SUPPORT PORTAL (DEFAULT)
           ───────────────────────────────────────────────────────────────────────────── */}
       {viewMode === 'customer' && (
-        <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+        <main className="relative z-10 flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
           
           {/* Customer Portal Hero */}
-          <div className="text-center py-6 sm:py-8 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" /> {t.heroBadge}
+          <div className="relative text-center py-6 sm:py-8 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs text-blue-300 font-semibold shadow-inner backdrop-blur-md">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+              </span>
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> 
+              <span>{t.heroBadge}</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+            
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
               {t.heroTitle}
             </h1>
             <p className="text-slate-400 text-sm max-w-lg mx-auto leading-relaxed">
@@ -555,36 +574,41 @@ export default function App() {
 
             {/* Sub-tabs: Submit vs Track */}
             <div className="flex items-center justify-center gap-2 pt-3">
-              <button
-                onClick={() => { setCustomerSubTab('submit'); setCustSubmissionResult(null); }}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  customerSubTab === 'submit'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                }`}
-              >
-                {t.tabSubmit}
-              </button>
-              <button
-                onClick={() => setCustomerSubTab('track')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  customerSubTab === 'track'
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
-                }`}
-              >
-                {t.tabTrack}
-              </button>
+              <div className="inline-flex p-1 bg-slate-900/90 border border-white/10 rounded-2xl shadow-inner backdrop-blur-xl">
+                <button
+                  onClick={() => { setCustomerSubTab('submit'); setCustSubmissionResult(null); }}
+                  className={`px-5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                    customerSubTab === 'submit'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                  }`}
+                >
+                  {t.tabSubmit}
+                </button>
+                <button
+                  onClick={() => setCustomerSubTab('track')}
+                  className={`px-5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
+                    customerSubTab === 'track'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                  }`}
+                >
+                  {t.tabTrack}
+                </button>
+              </div>
             </div>
           </div>
 
           {/* SUB-VIEW A: SUBMIT A TICKET */}
           {customerSubTab === 'submit' && (
-            <div className="bg-[#0D1527] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl">
+            <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-10 shadow-[0_12px_40px_-15px_rgba(0,0,0,0.5)]">
+              {/* Top Subtle Light Stroke */}
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+
               {!custSubmissionResult ? (
-                <form onSubmit={handleCustomerSubmit} className="space-y-5">
+                <form onSubmit={handleCustomerSubmit} className="space-y-6">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
                       {t.formEmailLabel} <span className="text-rose-400">{t.formEmailReq}</span>
                     </label>
                     <input
@@ -593,16 +617,16 @@ export default function App() {
                       value={custEmail}
                       onChange={e => setCustEmail(e.target.value)}
                       placeholder={t.formEmailPlaceholder}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/80 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
                     />
-                    <p className="text-[11px] text-slate-500 mt-1.5">
+                    <p className="text-[11px] text-slate-500 mt-2">
                       {t.formEmailSub}
                     </p>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
                         {t.formMessageLabel} <span className="text-rose-400">{t.formEmailReq}</span>
                       </label>
                     </div>
@@ -612,13 +636,13 @@ export default function App() {
                       value={custMessage}
                       onChange={e => setCustMessage(e.target.value)}
                       placeholder={t.formMessagePlaceholder}
-                      className="w-full px-4 py-3 rounded-xl bg-slate-900/90 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-y"
+                      className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/80 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all resize-y shadow-inner"
                     />
                   </div>
 
                   {/* Suggested quick topic tags */}
                   <div>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">{t.commonInquiries}</p>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">{t.commonInquiries}</p>
                     <div className="flex flex-wrap gap-2">
                       {[
                         t.promptAiServices,
@@ -630,7 +654,7 @@ export default function App() {
                           key={idx}
                           type="button"
                           onClick={() => setCustMessage(prompt)}
-                          className="px-3 py-1.5 rounded-lg text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-slate-700 transition-all text-left truncate max-w-full"
+                          className="px-3.5 py-2 rounded-xl text-xs bg-slate-950/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all text-left truncate max-w-full shadow-sm"
                         >
                           + {prompt}
                         </button>
@@ -640,22 +664,26 @@ export default function App() {
 
                   {/* Live Progressive Stepper during AI Analysis */}
                   {custSubmitting && (
-                    <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/60 space-y-3 shadow-inner">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-blue-300">
-                        <span className="flex items-center gap-2">
-                          <Bot className="w-4 h-4 text-blue-400 animate-pulse" />
-                          <span>{lang === 'bn' ? "মাল্টি-এজেন্ট প্রসেসিং চলছে..." : "Autonomous Multi-Agent Processing..."}</span>
+                    <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900/60 border border-blue-500/30 space-y-3.5 shadow-inner backdrop-blur-md">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+                        <span className="flex items-center gap-2 text-blue-300">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+                          </span>
+                          <Bot className="w-4 h-4 text-cyan-400" />
+                          <span className="tracking-wide">{lang === 'bn' ? "মাল্টি-এজেন্ট প্রসেসিং চলছে..." : "Autonomous Multi-Agent Processing..."}</span>
                         </span>
-                        <span className="text-[11px] font-mono text-blue-300 bg-blue-900/50 px-2.5 py-0.5 rounded-full border border-blue-700/50">
+                        <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-800/60 shadow-sm">
                           {submitProgressStep === 1 && (lang === 'bn' ? "ধাপ ১/৪: ইনটেন্ট ও প্রায়োরিটি অ্যানালাইসিস..." : "Step 1/4: Analyzing intent & priority...")}
                           {submitProgressStep === 2 && (lang === 'bn' ? "ধাপ ২/৪: ৩০-চাংক নলেজ বেস ও সিস্টেম ডাটা সার্চ..." : "Step 2/4: Scanning 30-chunk KB & systems...")}
                           {submitProgressStep === 3 && (lang === 'bn' ? "ধাপ ৩/৪: জেমিনাই দিয়ে নির্ভুল উত্তর তৈরি..." : "Step 3/4: Drafting grounded solution...")}
                           {submitProgressStep >= 4 && (lang === 'bn' ? "ধাপ ৪/৪: পলিসি সেফটি গেট ভেরিফিকেশন..." : "Step 4/4: Evaluating safety gate...")}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-slate-950 rounded-full h-2 p-0.5 border border-slate-800 overflow-hidden shadow-inner">
                         <div 
-                          className="bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-400 h-1.5 rounded-full transition-all duration-700 ease-out"
+                          className="bg-gradient-to-r from-blue-500 via-indigo-400 to-cyan-400 h-full rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(56,189,248,0.5)]"
                           style={{ width: `${Math.min(submitProgressStep * 25, 96)}%` }}
                         />
                       </div>
@@ -672,17 +700,17 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={custSubmitting}
-                      className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-extrabold text-sm shadow-[0_10px_25px_-5px_rgba(37,99,235,0.4)] active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                     >
                       {custSubmitting ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          {t.submittingBtn}
+                          <span>{t.submittingBtn}</span>
                         </>
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
-                          {t.submitBtn}
+                          <span>{t.submitBtn}</span>
                         </>
                       )}
                     </button>
@@ -692,24 +720,28 @@ export default function App() {
                 /* Submission Result Card */
                 <div className="space-y-6">
                   {/* Status Banner */}
-                  <div className={`p-5 rounded-xl border flex items-start gap-3.5 ${
+                  <div className={`p-6 rounded-2xl border flex items-start gap-4 backdrop-blur-md shadow-lg ${
                     custSubmissionResult.status === 'resolved'
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                      : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                      : 'bg-amber-950/20 border-amber-500/30 text-amber-300'
                   }`}>
                     {custSubmissionResult.status === 'resolved' ? (
-                      <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                      </div>
                     ) : (
-                      <AlertTriangle className="w-6 h-6 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="h-10 w-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-6 h-6 text-amber-400" />
+                      </div>
                     )}
                     <div>
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <h3 className="font-bold text-base text-white">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <h3 className="font-extrabold text-base text-white">
                           {custSubmissionResult.status === 'resolved' 
                             ? t.resolvedHeader 
                             : t.escalatedHeader}
                         </h3>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-800 text-blue-400 border border-slate-700">
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-slate-900 text-cyan-300 border border-slate-700">
                           #TKT-{custSubmissionResult.ticket_id}
                         </span>
                       </div>
@@ -723,36 +755,36 @@ export default function App() {
 
                   {/* Grounded Response / Solution */}
                   {custSubmissionResult.draft_response && (
-                    <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <div className="relative overflow-hidden bg-slate-950/90 border border-white/[0.08] rounded-2xl p-6 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                        <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                           <Bot className="w-4 h-4 text-emerald-400" /> {t.officialResponse}
                         </span>
                         <button
                           onClick={() => handleCopy(custSubmissionResult.draft_response || "")}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all border border-slate-700"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-700 shadow-sm"
                         >
-                          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                          {copied ? t.copied : t.copy}
+                          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                          <span>{copied ? t.copied : t.copy}</span>
                         </button>
                       </div>
-                      <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-lg border border-slate-800">
+                      <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#050811] p-5 rounded-xl border border-slate-800/80 shadow-inner">
                         {custSubmissionResult.draft_response}
                       </div>
                     </div>
                   )}
 
                   {/* Actions */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
                     <p className="text-xs text-slate-400 font-mono">
-                      {t.ticketIdNotice} <strong className="text-white">#TKT-{custSubmissionResult.ticket_id}</strong> {t.forTracking}
+                      {t.ticketIdNotice} <strong className="text-cyan-300 font-bold">#TKT-{custSubmissionResult.ticket_id}</strong> {t.forTracking}
                     </p>
                     <button
                       onClick={() => {
                         setCustSubmissionResult(null);
                         setCustMessage('');
                       }}
-                      className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition-all"
+                      className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700/80 shadow-sm transition-all"
                     >
                       {t.submitAnother}
                     </button>
@@ -764,19 +796,21 @@ export default function App() {
 
           {/* SUB-VIEW B: TRACK TICKET STATUS */}
           {customerSubTab === 'track' && (
-            <div className="bg-[#0D1527] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-10 shadow-[0_12px_40px_-15px_rgba(0,0,0,0.5)] space-y-6">
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent" />
+
               <div>
-                <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                  <Search className="w-5 h-5 text-blue-400" /> {t.trackTitle}
+                <h3 className="text-lg sm:text-xl font-extrabold text-white mb-1 flex items-center gap-2">
+                  <Search className="w-5 h-5 text-cyan-400" /> {t.trackTitle}
                 </h3>
                 <p className="text-xs text-slate-400">
                   {t.trackDesc}
                 </p>
               </div>
 
-              <form onSubmit={handleCustomerTrack} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <form onSubmit={handleCustomerTrack} className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
                 <div className="sm:col-span-4">
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     Ticket ID *
                   </label>
                   <input
@@ -785,11 +819,11 @@ export default function App() {
                     value={trackInputId}
                     onChange={e => setTrackInputId(e.target.value)}
                     placeholder={t.trackPlaceholder}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-inner"
                   />
                 </div>
                 <div className="sm:col-span-5">
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                     {t.trackEmailLabel} *
                   </label>
                   <input
@@ -798,14 +832,14 @@ export default function App() {
                     value={trackEmail}
                     onChange={e => setTrackEmail(e.target.value)}
                     placeholder={t.trackEmailPlaceholder}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-inner"
                   />
                 </div>
                 <div className="sm:col-span-3 flex items-end">
                   <button
                     type="submit"
                     disabled={trackLoading}
-                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                   >
                     {trackLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     <span>{t.trackBtn}</span>
@@ -814,54 +848,54 @@ export default function App() {
               </form>
 
               {trackError && (
-                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2.5">
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
                   <span>{trackError}</span>
                 </div>
               )}
 
               {trackResult && (
-                <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="bg-slate-950/80 border border-white/[0.08] rounded-2xl p-6 space-y-4 shadow-xl">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-sm text-blue-400">Ticket #{trackResult.id}</span>
+                      <span className="font-mono font-bold text-sm text-cyan-400">Ticket #{trackResult.id}</span>
                       <span className="text-xs text-slate-500">•</span>
-                      <span className="text-xs text-slate-400">{trackResult.customer.email}</span>
+                      <span className="text-xs text-slate-300 font-semibold">{trackResult.customer.email}</span>
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                       trackResult.status === 'resolved'
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                         : trackResult.status === 'escalated'
-                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                     }`}>
                       {trackResult.status}
                     </span>
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{t.yourMessage}</p>
-                    <p className="text-xs text-slate-300 italic bg-slate-900 p-3 rounded-lg border border-slate-800">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{t.yourMessage}</p>
+                    <p className="text-xs text-slate-300 italic bg-slate-900/90 p-4 rounded-xl border border-slate-800 shadow-inner">
                       &ldquo;{trackResult.raw_message}&rdquo;
                     </p>
                   </div>
 
                   {trackResult.draft_response ? (
                     <div>
-                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{t.officialResponse}</p>
-                      <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#070B14] p-3.5 rounded-lg border border-slate-800">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{t.officialResponse}</p>
+                      <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed bg-[#050811] p-4 rounded-xl border border-slate-800 shadow-inner">
                         {trackResult.draft_response}
                       </div>
                     </div>
                   ) : (
-                    <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium">
                       {t.trackUnderReview}
                     </div>
                   )}
 
-                  <div className="text-[11px] text-slate-500 flex justify-between items-center pt-2">
-                    <span>{t.categoryLabel} {trackResult.category}</span>
-                    <span>{t.createdLabel} {trackResult.created_at ? new Date(trackResult.created_at).toLocaleString() : '--'}</span>
+                  <div className="text-[11px] text-slate-500 flex justify-between items-center pt-2 border-t border-slate-800/80">
+                    <span>{t.categoryLabel} <strong className="text-slate-300">{trackResult.category}</strong></span>
+                    <span>{t.createdLabel} <strong className="text-slate-300">{trackResult.created_at ? new Date(trackResult.created_at).toLocaleString() : '--'}</strong></span>
                   </div>
                 </div>
               )}
@@ -874,36 +908,37 @@ export default function App() {
           MODE 2: PROTECTED TEAM OPERATIONS CONSOLE
           ───────────────────────────────────────────────────────────────────────────── */}
       {viewMode === 'team' && (
-        <div className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+        <div className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
           
           {/* Team Console Top Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/[0.08] pb-5">
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/30">
                   {t.internalOps}
                 </span>
-                <span className="text-xs text-slate-500">{t.authorizedSession}</span>
+                <span className="text-xs text-slate-400">{t.authorizedSession}</span>
               </div>
-              <h2 className="text-2xl font-extrabold text-white mt-0.5">{t.telemetryTitle}</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-white mt-1 tracking-tight">{t.telemetryTitle}</h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={() => setViewMode('customer')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-all shadow-sm"
               >
-                <ArrowLeft className="w-3.5 h-3.5" /> {t.backCustomer}
+                <ArrowLeft className="w-3.5 h-3.5" /> 
+                <span>{t.backCustomer}</span>
               </button>
 
               <button
                 onClick={() => { fetchStats(); fetchTickets(); }}
                 disabled={refreshingTickets}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-all shadow-sm"
                 title="Sync database records"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-blue-400' : ''}`} />
-                {t.syncDb}
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-cyan-400' : ''}`} />
+                <span>{t.syncDb}</span>
               </button>
             </div>
           </div>
@@ -912,23 +947,25 @@ export default function App() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTeamTab('dashboard')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                 activeTeamTab === 'dashboard'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent hover:border-slate-800'
               }`}
             >
-              <BarChart3 className="w-4 h-4" /> {t.opsConsole}
+              <BarChart3 className="w-4 h-4" /> 
+              <span>{t.opsConsole}</span>
             </button>
             <button
               onClick={() => { setActiveTeamTab('tickets'); fetchTickets(); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                 activeTeamTab === 'tickets'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900/80 border border-transparent hover:border-slate-800'
               }`}
             >
-              <Inbox className="w-4 h-4" /> {t.inboundLedger} ({tickets.length})
+              <Inbox className="w-4 h-4" /> 
+              <span>{t.inboundLedger} ({tickets.length})</span>
             </button>
           </div>
 
@@ -937,75 +974,79 @@ export default function App() {
               
               {/* KPI Metrics */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-5 shadow-lg">
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500/60" />
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiTotal}</p>
-                      <h3 className="text-3xl font-extrabold mt-1 text-white">{stats ? stats['Tickets Today'] : '--'}</h3>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.kpiTotal}</p>
+                      <h3 className="text-3xl font-black mt-1 text-white tracking-tight">{stats ? stats['Tickets Today'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
                       <Inbox className="w-5 h-5" />
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
+                  <p className="text-[11px] text-slate-400 mt-3 flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400"></span> {t.kpiTotalSub}
                   </p>
                 </div>
 
-                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-5 shadow-lg">
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500/60" />
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiResolved}</p>
-                      <h3 className="text-3xl font-extrabold mt-1 text-emerald-400">{stats ? stats['AI Resolved'] : '--'}</h3>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.kpiResolved}</p>
+                      <h3 className="text-3xl font-black mt-1 text-emerald-400 tracking-tight">{stats ? stats['AI Resolved'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       <CheckCircle2 className="w-5 h-5" />
                     </div>
                   </div>
-                  <p className="text-[11px] text-emerald-400/80 mt-3 font-semibold">
+                  <p className="text-[11px] text-emerald-400 mt-3 font-bold">
                     {stats ? stats['Resolution Rate'] : '--'} {t.resolutionRate}
                   </p>
                 </div>
 
-                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-5 shadow-lg">
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-amber-500/60" />
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiEscalated}</p>
-                      <h3 className="text-3xl font-extrabold mt-1 text-amber-400">{stats ? stats['Human Escalated'] : '--'}</h3>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.kpiEscalated}</p>
+                      <h3 className="text-3xl font-black mt-1 text-amber-400 tracking-tight">{stats ? stats['Human Escalated'] : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
                       <AlertTriangle className="w-5 h-5" />
                     </div>
                   </div>
-                  <p className="text-[11px] text-amber-400/80 mt-3 font-semibold">
+                  <p className="text-[11px] text-amber-400 mt-3 font-bold">
                     {stats ? stats['Escalation Rate'] : '--'} {t.escalationRate}
                   </p>
                 </div>
 
-                <div className="bg-[#0D1527] border border-slate-800/80 p-5 rounded-2xl relative overflow-hidden shadow-sm">
+                <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-5 shadow-lg">
+                  <div className="absolute top-0 inset-x-0 h-0.5 bg-purple-500/60" />
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t.kpiAvgChurn}</p>
-                      <h3 className="text-3xl font-extrabold mt-1 text-purple-400">{stats ? stats['Average Churn Risk'] || '22%' : '--'}</h3>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{t.kpiAvgChurn}</p>
+                      <h3 className="text-3xl font-black mt-1 text-purple-400 tracking-tight">{stats ? stats['Average Churn Risk'] || '22%' : '--'}</h3>
                     </div>
                     <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
                       <ShieldAlert className="w-5 h-5" />
                     </div>
                   </div>
-                  <p className="text-[11px] text-purple-400/80 mt-3 font-semibold">
+                  <p className="text-[11px] text-purple-300 mt-3 font-bold">
                     {t.kpiRetentionSafe}
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 rounded-2xl relative overflow-hidden shadow-lg text-white flex flex-col justify-between">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-5 shadow-xl text-white flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-center">
-                      <p className="text-xs font-medium text-blue-100 uppercase tracking-wider">{t.kpiLatency}</p>
-                      <Zap className="w-4 h-4 text-blue-200" />
+                      <p className="text-[11px] font-bold text-blue-100 uppercase tracking-wider">{t.kpiLatency}</p>
+                      <Zap className="w-4 h-4 text-cyan-200" />
                     </div>
-                    <h3 className="text-3xl font-extrabold mt-1">~ 1.8 sec</h3>
+                    <h3 className="text-3xl font-black mt-1 tracking-tight">~ 1.8 sec</h3>
                   </div>
-                  <p className="text-[11px] text-blue-200 mt-3">
+                  <p className="text-[11px] text-blue-100 mt-3 font-medium">
                     {t.kpiLatencySub}
                   </p>
                 </div>
@@ -1015,15 +1056,15 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* 1. 7-Day Inbound & Resolution Trend Chart */}
-                <div className="lg:col-span-2 bg-[#0D1527] border border-slate-800/80 p-6 rounded-2xl shadow-sm">
+                <div className="lg:col-span-2 relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-7 shadow-xl">
                   <div className="flex flex-wrap justify-between items-center mb-6 gap-2">
                     <div>
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-blue-400" /> {t.trendTitle}
+                      <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-cyan-400" /> {t.trendTitle}
                       </h3>
                       <p className="text-xs text-slate-400">{t.trendDesc}</p>
                     </div>
-                    <div className="flex items-center gap-4 text-xs font-medium">
+                    <div className="flex items-center gap-4 text-xs font-semibold">
                       <span className="flex items-center gap-1.5 text-slate-300">
                         <span className="w-3 h-3 rounded-sm bg-blue-500"></span> {t.trendTotal}
                       </span>
@@ -1053,24 +1094,24 @@ export default function App() {
                       const escH = Math.max(4, Math.round((item.escalated / maxVal) * 140));
                       return (
                         <div key={idx} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
-                          <div className="w-full flex items-end justify-center gap-1 h-36 pb-1">
+                          <div className="w-full flex items-end justify-center gap-1.5 h-36 pb-1">
                             <div 
                               style={{ height: `${totalH}px` }} 
-                              className="w-2.5 sm:w-3.5 bg-blue-600/70 hover:bg-blue-500 rounded-t-sm transition-all"
+                              className="w-2.5 sm:w-3.5 bg-gradient-to-t from-blue-700 to-cyan-500 hover:brightness-125 rounded-t-md transition-all shadow-sm"
                               title={`Total: ${item.total}`}
                             ></div>
                             <div 
                               style={{ height: `${resH}px` }} 
-                              className="w-2.5 sm:w-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-t-sm transition-all"
+                              className="w-2.5 sm:w-3.5 bg-gradient-to-t from-emerald-700 to-emerald-400 hover:brightness-125 rounded-t-md transition-all shadow-sm"
                               title={`AI Resolved: ${item.resolved}`}
                             ></div>
                             <div 
                               style={{ height: `${escH}px` }} 
-                              className="w-2.5 sm:w-3.5 bg-amber-500 hover:bg-amber-400 rounded-t-sm transition-all"
+                              className="w-2.5 sm:w-3.5 bg-gradient-to-t from-amber-700 to-amber-400 hover:brightness-125 rounded-t-md transition-all shadow-sm"
                               title={`Escalated: ${item.escalated}`}
                             ></div>
                           </div>
-                          <span className="text-[11px] font-semibold text-slate-400 group-hover:text-white transition-colors">{item.day}</span>
+                          <span className="text-[11px] font-bold text-slate-400 group-hover:text-white transition-colors">{item.day}</span>
                         </div>
                       );
                     })}
@@ -1078,19 +1119,19 @@ export default function App() {
                 </div>
 
                 {/* 2. Category & Churn Health Breakdown */}
-                <div className="bg-[#0D1527] border border-slate-800/80 p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+                <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-7 shadow-xl flex flex-col justify-between">
                   <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <div className="flex justify-between items-center mb-5">
+                      <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
                         <PieChart className="w-4 h-4 text-purple-400" /> {t.catDistribution}
                       </h3>
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase tracking-wider">
                         {t.liveDistribution}
                       </span>
                     </div>
 
                     {/* Progress bars */}
-                    <div className="space-y-3 mt-1">
+                    <div className="space-y-3.5 mt-1">
                       {[
                         { name: "Order & Shipping", key: "Order", color: "bg-blue-500" },
                         { name: "Billing & Refund", key: "Billing", color: "bg-amber-500" },
@@ -1104,12 +1145,12 @@ export default function App() {
                         const total = stats?.['Tickets Today'] || tickets.length || 7;
                         const pct = Math.min(100, Math.round((count / (total || 1)) * 100));
                         return (
-                          <div key={idx} className="space-y-1">
-                            <div className="flex justify-between text-xs font-medium">
+                          <div key={idx} className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold">
                               <span className="text-slate-300">{cat.name}</span>
                               <span className="text-slate-400 font-mono">{count} ({pct}%)</span>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                            <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5 shadow-inner">
                               <div 
                                 style={{ width: `${Math.max(pct, 5)}%` }} 
                                 className={`h-full ${cat.color} rounded-full transition-all duration-500`}
@@ -1122,17 +1163,17 @@ export default function App() {
                   </div>
 
                   {/* Churn Risk Health Banner */}
-                  <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800/80">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800/80 shadow-inner">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
                         <ShieldAlert className="w-4 h-4" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{t.portfolioRisk}</p>
-                        <p className="text-xs font-extrabold text-white">{stats?.["Average Churn Risk"] || "22.5%"} Average</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.portfolioRisk}</p>
+                        <p className="text-xs font-black text-white">{stats?.["Average Churn Risk"] || "22.5%"} Average</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span className="text-[10px] font-extrabold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">
                       {t.healthy}
                     </span>
                   </div>
@@ -1141,10 +1182,10 @@ export default function App() {
               </div>
 
               {/* Inbound Ticket Simulator with Quick Presets */}
-              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
+              <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-7 shadow-xl">
                 <div className="mb-4">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-blue-400" /> {t.simulatorTitle}
+                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-cyan-400" /> {t.simulatorTitle}
                   </h3>
                   <p className="text-xs text-slate-400">
                     {t.simulatorDesc}
@@ -1152,7 +1193,7 @@ export default function App() {
                 </div>
 
                 {/* Presets */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mb-5">
                   {PRESET_SCENARIOS.map((preset, idx) => (
                     <button
                       key={idx}
@@ -1161,40 +1202,40 @@ export default function App() {
                         setSimEmail(preset.email);
                         setSimMessage(preset.message);
                       }}
-                      className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 hover:bg-slate-800/60 text-left transition-all group"
+                      className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 hover:bg-slate-900/90 text-left transition-all group shadow-sm"
                     >
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-500/10 text-cyan-300 border border-blue-500/30">
                           {preset.tag}
                         </span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all" />
                       </div>
-                      <p className="text-xs font-semibold text-slate-200 truncate">{preset.label}</p>
+                      <p className="text-xs font-bold text-slate-200 truncate">{preset.label}</p>
                       <p className="text-[10px] text-slate-400 font-mono truncate">{preset.email}</p>
                     </button>
                   ))}
                 </div>
 
                 {/* Simulation Form */}
-                <form onSubmit={simulateTicket} className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <form onSubmit={simulateTicket} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     <div className="sm:col-span-1">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">{t.simEmailLabel}</label>
+                      <label className="block text-xs font-bold text-slate-400 mb-1.5">{t.simEmailLabel}</label>
                       <input
                         type="email"
                         value={simEmail}
                         onChange={e => setSimEmail(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-inner"
                         required
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">{t.simMessageLabel}</label>
+                      <label className="block text-xs font-bold text-slate-400 mb-1.5">{t.simMessageLabel}</label>
                       <input
                         type="text"
                         value={simMessage}
                         onChange={e => setSimMessage(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-slate-700/80 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-inner"
                         required
                       />
                     </div>
@@ -1204,16 +1245,17 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={loadingSim}
-                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-semibold text-xs shadow-md active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
+                      className="px-7 py-3 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-xs shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50 transition-all flex items-center gap-2"
                     >
                       {loadingSim ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          {t.simRunningBtn}
+                          <span>{t.simRunningBtn}</span>
                         </>
                       ) : (
                         <>
-                          <Send className="w-4 h-4" /> {t.simRunBtn}
+                          <Send className="w-4 h-4" /> 
+                          <span>{t.simRunBtn}</span>
                         </>
                       )}
                     </button>
@@ -1222,28 +1264,28 @@ export default function App() {
               </div>
 
               {/* Visual LangGraph 6-Node Architecture */}
-              <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
-                <h3 className="text-xs font-bold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wider">
+              <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-7 shadow-xl">
+                <h3 className="text-xs font-extrabold text-slate-300 mb-4 flex items-center gap-2 uppercase tracking-wider">
                   <Activity className="w-4 h-4 text-emerald-400" /> {t.architectureTitle}
                 </h3>
                 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   {[
                     { step: "1", name: t.node1, desc: t.node1Desc, icon: Bot, color: "text-purple-400" },
-                    { step: "2", name: t.node2, desc: t.node2Desc, icon: User, color: "text-blue-400" },
+                    { step: "2", name: t.node2, desc: t.node2Desc, icon: User, color: "text-cyan-400" },
                     { step: "3", name: t.node3, desc: t.node3Desc, icon: BookOpen, color: "text-emerald-400" },
                     { step: "4", name: t.node4, desc: t.node4Desc, icon: Sparkles, color: "text-amber-400" },
                     { step: "5", name: t.node5, desc: t.node5Desc, icon: ShieldCheck, color: "text-rose-400" },
                     { step: "6", name: t.node6, desc: t.node6Desc, icon: CheckCircle2, color: "text-emerald-400" },
                   ].map((node, i) => (
-                    <div key={i} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex flex-col justify-between">
+                    <div key={i} className="bg-slate-950/80 border border-slate-800/80 hover:border-slate-700 p-3.5 rounded-2xl flex flex-col justify-between transition-all group shadow-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-mono font-bold text-slate-500">#{node.step}</span>
-                        <node.icon className={`w-4 h-4 ${node.color}`} />
+                        <span className="text-[10px] font-mono font-black text-slate-500">#{node.step}</span>
+                        <node.icon className={`w-4 h-4 ${node.color} group-hover:scale-110 transition-transform`} />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-200">{node.name}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{node.desc}</p>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{node.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -1252,16 +1294,16 @@ export default function App() {
 
               {/* Simulation Output Card */}
               {latestSimTicket && (
-                <div className="bg-[#0D1527] border border-slate-800 rounded-2xl p-6 shadow-md">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-800 pb-4">
+                <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl p-6 sm:p-7 shadow-xl">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-slate-800/80 pb-4">
                     <div className="flex items-center gap-3">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-cyan-300 border border-blue-500/30 font-mono">
                         Ticket #{latestSimTicket.ticket_id}
                       </span>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                         latestSimTicket.status === 'resolved' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                          : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                       }`}>
                         {latestSimTicket.status === 'resolved' ? (
                           <>
@@ -1273,7 +1315,7 @@ export default function App() {
                           </>
                         )}
                       </span>
-                      <span className="px-2.5 py-0.5 rounded-lg text-xs bg-slate-800 text-slate-300 border border-slate-700">
+                      <span className="px-2.5 py-0.5 rounded-lg text-xs bg-slate-900 text-slate-300 border border-slate-800">
                         Category: {latestSimTicket.category || "General"}
                       </span>
                     </div>
@@ -1281,10 +1323,10 @@ export default function App() {
                     {latestSimTicket.draft_response && (
                       <button
                         onClick={() => handleCopy(latestSimTicket.draft_response || "")}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all border border-slate-700"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-200 transition-all border border-slate-700 shadow-sm"
                       >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        {copied ? "Copied!" : "Copy Response"}
+                        <span>{copied ? "Copied!" : "Copy Response"}</span>
                       </button>
                     )}
                   </div>
@@ -1309,41 +1351,41 @@ export default function App() {
                   ) : (
                     <div className="space-y-4">
                       {/* Grounded response */}
-                      <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-xl">
+                      <div className="bg-slate-950/80 border border-white/[0.08] p-5 rounded-2xl shadow-inner">
                         <div className="flex items-center justify-between mb-3">
                           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                             <Bot className="w-4 h-4 text-emerald-400" /> Grounded AI Solution Drafted:
                           </span>
                           <span className="text-[11px] text-emerald-400 font-mono">Grounded by ZENIVIXON Master KB</span>
                         </div>
-                        <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#070B14] p-4 rounded-xl border border-slate-800/80">
+                        <div className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap font-sans bg-[#050811] p-4 rounded-xl border border-slate-800/80">
                           {latestSimTicket.draft_response || "Inquiry processed and closed."}
                         </div>
                       </div>
 
                       {/* Retention action & Churn Risk */}
                       {latestSimTicket.recommended_action && (
-                        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between">
+                        <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-between shadow-inner">
                           <div className="flex items-center gap-2.5">
                             <ShieldAlert className="w-4 h-4 text-purple-400" />
                             <span className="text-xs text-purple-200 font-medium">
                               <strong>Retention Guidance:</strong> {latestSimTicket.recommended_action}
                             </span>
                           </div>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 whitespace-nowrap">
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 whitespace-nowrap">
                             Churn Risk: {latestSimTicket.churn_risk_score || 20}%
                           </span>
                         </div>
                       )}
 
-                      <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl">
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                          <Terminal className="w-3.5 h-3.5 text-blue-400" /> LangGraph Telemetry Execution Trace:
+                      <div className="bg-slate-950/80 border border-white/[0.08] p-5 rounded-2xl shadow-inner">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                          <Terminal className="w-3.5 h-3.5 text-cyan-400" /> LangGraph Telemetry Execution Trace:
                         </p>
                         <div className="space-y-1.5 font-mono text-xs text-slate-300">
                           {latestSimTicket.trace?.map((step: string, idx: number) => (
-                            <div key={idx} className="flex items-start gap-2 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/60">
-                              <span className="text-blue-400 select-none">[{idx + 1}]</span>
+                            <div key={idx} className="flex items-start gap-2 bg-[#050811] px-3.5 py-2 rounded-xl border border-slate-800/60 shadow-sm">
+                              <span className="text-cyan-400 select-none font-bold">[{idx + 1}]</span>
                               <span className="text-slate-200">{step}</span>
                             </div>
                           ))}
@@ -1356,11 +1398,11 @@ export default function App() {
             </div>
           ) : (
             /* Inbound Ticket Ledger */
-            <div className="bg-[#0D1527] border border-slate-800 rounded-2xl overflow-hidden shadow-md">
-              <div className="p-5 border-b border-slate-800 space-y-4">
+            <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl shadow-xl">
+              <div className="p-6 border-b border-white/[0.08] space-y-4">
                 <div className="flex justify-between items-center">
                   <div>
-                    <h3 className="font-bold text-base text-white">{t.ledgerTitle}</h3>
+                    <h3 className="font-extrabold text-base text-white">{t.ledgerTitle}</h3>
                     <p className="text-xs text-slate-400">{t.ledgerDesc} ({tickets.length})</p>
                   </div>
                 </div>
@@ -1373,7 +1415,7 @@ export default function App() {
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       placeholder={t.searchPlaceholder}
-                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 shadow-inner"
                     />
                   </div>
 
@@ -1382,7 +1424,7 @@ export default function App() {
                     <select
                       value={statusFilter}
                       onChange={e => setStatusFilter(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                      className="flex-1 px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                     >
                       <option value="all">{t.filterAllStatus}</option>
                       <option value="resolved">{t.filterResolved}</option>
@@ -1395,7 +1437,7 @@ export default function App() {
                     <select
                       value={categoryFilter}
                       onChange={e => setCategoryFilter(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
                     >
                       <option value="all">{t.filterAllCats}</option>
                       <option value="General">General</option>
@@ -1415,7 +1457,7 @@ export default function App() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/80 text-slate-400 text-[11px] font-semibold uppercase tracking-wider border-b border-slate-800">
+                    <thead className="bg-slate-950/90 text-slate-400 text-[11px] font-bold uppercase tracking-wider border-b border-slate-800">
                       <tr>
                         <th className="py-3.5 px-4">{t.colId}</th>
                         <th className="py-3.5 px-4">{t.colCustomer}</th>
@@ -1439,7 +1481,7 @@ export default function App() {
                           className="hover:bg-slate-800/40 transition-colors cursor-pointer group"
                           onClick={() => openTicketDetail(t.id)}
                         >
-                          <td className="py-3 px-4 font-mono font-bold text-blue-400">
+                          <td className="py-3 px-4 font-mono font-bold text-cyan-400">
                             #{t.id}
                           </td>
                           <td className="py-3 px-4">
@@ -1452,7 +1494,7 @@ export default function App() {
                             </p>
                           </td>
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-900 text-slate-300 border border-slate-800">
                               {t.category}
                             </span>
                           </td>
@@ -1496,7 +1538,7 @@ export default function App() {
                                 e.stopPropagation();
                                 openTicketDetail(t.id);
                               }}
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-all"
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-blue-600 text-slate-300 hover:text-white transition-all border border-slate-800"
                               title="Inspect ticket"
                             >
                               <Eye className="w-3.5 h-3.5" />
@@ -1517,18 +1559,20 @@ export default function App() {
           TEAM PASSCODE AUTHENTICATION MODAL
           ───────────────────────────────────────────────────────────────────────────── */}
       {showPasscodeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0D1527] border border-slate-700/80 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-950/90 w-full max-w-md p-7 shadow-2xl space-y-4">
+            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+            
+            <div className="flex justify-between items-center border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/30">
                   <Key className="w-5 h-5" />
                 </div>
-                <h3 className="font-bold text-base text-white">{t.passcodeTitle}</h3>
+                <h3 className="font-extrabold text-base text-white">{t.passcodeTitle}</h3>
               </div>
               <button
                 onClick={() => setShowPasscodeModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1538,7 +1582,7 @@ export default function App() {
               {t.passcodeDesc}
             </p>
 
-            <form onSubmit={handleVerifyPasscode} className="space-y-3">
+            <form onSubmit={handleVerifyPasscode} className="space-y-4">
               <div>
                 <input
                   type="password"
@@ -1546,27 +1590,26 @@ export default function App() {
                   value={passcodeInput}
                   onChange={e => { setPasscodeInput(e.target.value); setPasscodeError(false); }}
                   placeholder={t.passcodePlaceholder}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700/80 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 shadow-inner"
                 />
                 {passcodeError && (
-                  <p className="text-xs text-rose-400 mt-1.5 flex items-center gap-1">
+                  <p className="text-xs text-rose-400 mt-2 flex items-center gap-1 font-medium">
                     <AlertCircle className="w-3.5 h-3.5" /> {t.passcodeInvalid}
                   </p>
                 )}
-
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowPasscodeModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all"
+                  className="px-6 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg shadow-purple-500/25 transition-all"
                 >
                   {t.passcodeSubmit}
                 </button>
@@ -1580,20 +1623,20 @@ export default function App() {
           TICKET INSPECTOR MODAL (TEAM CONSOLE)
           ───────────────────────────────────────────────────────────────────────────── */}
       {selectedTicketId && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0D1527] border border-slate-700/80 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
-            <div className="p-5 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-[#0D1527] z-10">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-950/95 w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            <div className="p-5 border-b border-white/[0.08] flex justify-between items-center sticky top-0 bg-slate-950/90 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-sm font-bold text-blue-400">
+                <span className="font-mono text-sm font-black text-cyan-400">
                   Ticket #{selectedTicketId}
                 </span>
                 {ticketDetail && (
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                     ticketDetail.status === 'resolved'
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                       : ticketDetail.status === 'escalated'
-                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                   }`}>
                     {ticketDetail.status}
                   </span>
@@ -1601,7 +1644,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => { setSelectedTicketId(null); setTicketDetail(null); }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all"
+                className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-all border border-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1610,24 +1653,24 @@ export default function App() {
             <div className="p-6 space-y-5 flex-1">
               {loadingDetail ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-2 text-slate-400">
-                  <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                  <p className="text-sm">Loading ticket telemetry...</p>
+                  <RefreshCw className="w-6 h-6 animate-spin text-cyan-400" />
+                  <p className="text-sm font-medium">Loading ticket telemetry...</p>
                 </div>
               ) : ticketDetail ? (
                 <>
-                  <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                  <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex items-center justify-between shadow-inner">
                     <div>
-                      <p className="text-xs text-slate-400 uppercase font-semibold">Customer</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Customer</p>
                       <p className="text-sm font-bold text-white mt-0.5">{ticketDetail.customer.email}</p>
-                      <p className="text-xs text-slate-500 capitalize">{ticketDetail.customer.name} • {ticketDetail.customer.tier} Tier</p>
+                      <p className="text-xs text-slate-400 capitalize">{ticketDetail.customer.name} • {ticketDetail.customer.tier} Tier</p>
                     </div>
                     <div>
                       {ticketDetail.customer.is_verified ? (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Verified ID
                         </span>
                       ) : (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5" /> Unverified
                         </span>
                       )}
@@ -1635,25 +1678,25 @@ export default function App() {
                   </div>
 
                   <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">{t.rawInquiryTitle}</p>
-                    <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-sm text-slate-200 italic">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t.rawInquiryTitle}</p>
+                    <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-sm text-slate-200 italic shadow-inner">
                       &ldquo;{ticketDetail.raw_message}&rdquo;
                     </div>
                   </div>
 
                   {ticketDetail.draft_response && (
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                         <Bot className="w-4 h-4 text-emerald-400" /> {t.officialResponseModal}
                       </p>
-                      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      <div className="p-4 rounded-2xl bg-[#050811] border border-slate-800 text-sm text-slate-200 leading-relaxed whitespace-pre-wrap shadow-inner">
                         {ticketDetail.draft_response}
                       </div>
                     </div>
                   )}
 
                   {/* Churn Risk & Retention Advisor Guidance */}
-                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-2.5">
+                  <div className="p-5 rounded-2xl bg-purple-500/10 border border-purple-500/20 space-y-3 shadow-inner">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                         <ShieldAlert className="w-4 h-4 text-purple-400" /> {t.retentionAdvisorTitle} ({ticketDetail.churn_risk_score ?? 20}%)
@@ -1668,15 +1711,15 @@ export default function App() {
                       </span>
                     </div>
                     {ticketDetail.recommended_action && (
-                      <div className="text-xs text-purple-200 leading-relaxed font-medium bg-purple-950/40 p-3 rounded-lg border border-purple-800/40">
-                        <strong className="text-purple-300 block mb-0.5">Agent Retention Action:</strong>
+                      <div className="text-xs text-purple-200 leading-relaxed font-medium bg-purple-950/40 p-3.5 rounded-xl border border-purple-800/40">
+                        <strong className="text-purple-300 block mb-1">Agent Retention Action:</strong>
                         {ticketDetail.recommended_action}
                       </div>
                     )}
                   </div>
 
                   {ticketDetail.escalation_reason && (
-                    <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                    <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
                       <span className="font-bold flex items-center gap-1 mb-1">
                         <AlertTriangle className="w-4 h-4 text-rose-400" /> {t.escalationReasonModal}:
                       </span>
@@ -1686,12 +1729,12 @@ export default function App() {
 
                   {ticketDetail.tools_executed && ticketDetail.tools_executed.length > 0 && (
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tools Executed</p>
-                      <div className="space-y-1.5">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tools Executed</p>
+                      <div className="space-y-2">
                         {ticketDetail.tools_executed.map((tool, idx) => (
-                          <div key={idx} className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
-                            <span className="font-mono text-blue-400">{tool.name || tool.tool || 'tool'}()</span>
-                            <span className="text-slate-400">{tool.result || tool.data || 'Completed'}</span>
+                          <div key={idx} className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
+                            <span className="font-mono text-cyan-400 font-semibold">{tool.name || tool.tool || 'tool'}()</span>
+                            <span className="text-slate-300">{tool.result || tool.data || 'Completed'}</span>
                           </div>
                         ))}
                       </div>
@@ -1702,20 +1745,20 @@ export default function App() {
             </div>
 
             {ticketDetail && (
-              <div className="p-5 border-t border-slate-800 flex justify-between items-center bg-[#0D1527] sticky bottom-0">
-                <span className="text-xs text-slate-500">{t.quickChangeStatus}</span>
-                <div className="flex gap-2">
+              <div className="p-5 border-t border-white/[0.08] flex justify-between items-center bg-slate-950 sticky bottom-0">
+                <span className="text-xs text-slate-400">{t.quickChangeStatus}</span>
+                <div className="flex gap-2.5">
                   <button
                     onClick={() => handleUpdateStatus(ticketDetail.id, 'resolved')}
                     disabled={updatingStatus || ticketDetail.status === 'resolved'}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" /> Mark Resolved
                   </button>
                   <button
                     onClick={() => handleUpdateStatus(ticketDetail.id, 'escalated')}
                     disabled={updatingStatus || ticketDetail.status === 'escalated'}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-md shadow-rose-600/20"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" /> Escalate to Human
                   </button>
@@ -1728,4 +1771,3 @@ export default function App() {
     </div>
   );
 }
-
