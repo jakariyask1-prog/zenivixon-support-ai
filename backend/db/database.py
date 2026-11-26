@@ -31,7 +31,7 @@ except Exception as e:
     # Fallback to local SQLite for offline/Docker-less development
     import pathlib
     project_root = pathlib.Path(__file__).resolve().parent.parent.parent
-    fallback_db = project_root / "logiflow_support.db"
+    fallback_db = project_root / "zenivixon_support.db"
     fallback_url = f"sqlite:///{fallback_db.as_posix()}"
     print(f"[Database] Could not connect to primary DB ({e}). Falling back to SQLite: {fallback_url}")
     engine = create_engine(fallback_url, connect_args={"check_same_thread": False})

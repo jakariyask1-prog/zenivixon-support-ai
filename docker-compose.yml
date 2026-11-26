@@ -1,23 +1,14 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: zenivixon
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: zenivixon_db
+      POSTGRES_USER: ${POSTGRES_USER:-zenivixon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-zenivixon_db}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -29,5 +20,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
   qdrant_data:

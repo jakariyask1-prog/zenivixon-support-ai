@@ -198,10 +198,11 @@ export const TRANSLATIONS = {
     
     // Passcode Modal
     passcodeTitle: "Restricted Operations Console",
-    passcodeDesc: "Enter team passphrase to access operations telemetry, internal metrics, and Zendesk queue.",
-    passcodePlaceholder: "Enter Passphrase (e.g. zenivixon)",
+    passcodeDesc: "Enter your team passphrase to access operations telemetry, internal metrics, and Zendesk queue.",
+    passcodePlaceholder: "Enter Team Passphrase",
     passcodeSubmit: "Unlock Console",
-    passcodeInvalid: "Invalid passphrase. Try 'zenivixon' or 'zenivixon admin panel'."
+    passcodeInvalid: "Invalid passphrase. Please verify your team credentials.",
+    kbManager: "Knowledge Base"
   },
   bn: {
     // Brand & Header
@@ -348,8 +349,9 @@ export const TRANSLATIONS = {
     // Passcode Modal
     passcodeTitle: "সুরক্ষিত অপারেশনস কনসোল",
     passcodeDesc: "অপারেশনস টেলিমেট্রি এবং জেনডেস্ক কিউ অ্যাক্সেস করতে টিম পাসকোড প্রবেশ করান।",
-    passcodePlaceholder: "পাসকোড দিন (যেমন: zenivixon)",
+    passcodePlaceholder: "টিম পাসকোড লিখুন",
     passcodeSubmit: "কনসোল আনলক করুন",
-    passcodeInvalid: "ভুল পাসকোড। 'zenivixon' অথবা 'zenivixon admin panel' ব্যবহার করুন।"
+    passcodeInvalid: "ভুল পাসকোড। অনুগ্রহ করে সঠিক টিম পাসকোড দিন।",
+    kbManager: "নলেজ বেস"
   }
 };

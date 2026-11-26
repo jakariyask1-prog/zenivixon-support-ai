@@ -23,7 +23,9 @@ frontend/.env.*.local
 
 # Local Data Stores & SQLite
 logiflow_support.db
+zenivixon_support.db
 backend/logiflow_support.db
+backend/zenivixon_support.db
 backend/chroma_db/
 *.db
 *.sqlite
@@ -34,6 +36,7 @@ node_modules/
 **/node_modules/
 frontend/node_modules/
 frontend/.next/
+frontend/out/
 frontend/build/
 frontend/dist/
 *.tsbuildinfo

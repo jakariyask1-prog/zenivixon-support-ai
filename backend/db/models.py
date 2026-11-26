@@ -80,6 +80,7 @@ class Ticket(Base):
     escalation_reason = Column(Text, nullable=True)
     recommended_action = Column(Text, nullable=True)
     churn_risk_score = Column(Integer, default=25, nullable=True)
+    processing_time_ms = Column(Integer, nullable=True)
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     resolved_at = Column(DateTime, nullable=True)

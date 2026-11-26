@@ -23,7 +23,7 @@ from core.tools import (
 from core.zendesk import escalate_to_human
 from core.qdrant_store import search_kb
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_KEY:
     os.environ["GEMINI_API_KEY"] = GEMINI_KEY
@@ -185,78 +185,81 @@ def tool_execution_node(state: TicketState) -> dict:
     msg_lower = raw_msg.lower()
     category = state.get('category', '')
     cust_id = state.get('customer_id')
+    is_verified = bool(state.get('is_verified', False))
     
-    # 1. Search Knowledge Base
+    # 1. Search Knowledge Base (always available for all inquiries)
     docs = search_kb(raw_msg)
     doc_texts = [d['text'] for d in docs]
     
     tools_used = []
     
-    # 2. Extract Specific Order IDs (e.g. ORD-1001)
-    order_id_matches = re.findall(r'(?:ORD|ord)-\d+', raw_msg, re.IGNORECASE)
-    matched_orders = set([m.upper() for m in order_id_matches])
-    
-    for oid in matched_orders:
-        order_info = get_order(oid, customer_id=cust_id)
-        if order_info:
-            desc = f"Order {oid}: Status={order_info['status']}, Total=${order_info['total_amount']}, Placed={order_info['created_at'][:10]}"
-            tools_used.append({
-                "name": "get_order",
-                "result": desc,
-                "tool": "get_order",
-                "data": desc
-            })
-            
-    # If no specific order ID matched, check customer's latest order if inquiry is about orders
-    is_order_query = category == 'Order' or any(k in msg_lower for k in ['order', 'ship', 'track', 'অর্ডার', 'ডেলিভারি', 'পার্সেল'])
-    if not matched_orders and is_order_query and cust_id:
-        latest_order = get_latest_customer_order(cust_id)
-        if latest_order:
-            desc = f"Latest Order {latest_order['order_id']}: Status={latest_order['status']}, Total=${latest_order['total_amount']}"
-            tools_used.append({
-                "name": "get_latest_customer_order",
-                "result": desc,
-                "tool": "get_latest_customer_order",
-                "data": desc
-            })
-
-    # 3. Extract Specific Invoice IDs (e.g. INV-9901)
-    invoice_id_matches = re.findall(r'(?:INV|inv)-\d+', raw_msg, re.IGNORECASE)
-    matched_invoices = set([m.upper() for m in invoice_id_matches])
-    
-    for iid in matched_invoices:
-        inv_info = get_invoice(iid, customer_id=cust_id)
-        if inv_info:
-            desc = f"Invoice {iid}: Status={inv_info['status']}, Amount=${inv_info['amount']}, Due={inv_info.get('due_date', 'N/A')}"
-            tools_used.append({
-                "name": "get_invoice",
-                "result": desc,
-                "tool": "get_invoice",
-                "data": desc
-            })
-            
-    # Check invoices & subscriptions for customer
-    is_billing_query = category in ['Billing', 'Subscription', 'Refund'] or any(k in msg_lower for k in ['invoice', 'bill', 'charge', 'sub', 'ইনভয়েস', 'বিল', 'পেমেন্ট', 'টাকা', 'রিফান্ড'])
-    if is_billing_query and cust_id:
-        if not matched_invoices:
-            latest_inv = get_latest_customer_invoice(cust_id)
-            if latest_inv:
-                desc = f"Latest Invoice {latest_inv['invoice_id']}: Status={latest_inv['status']}, Amount=${latest_inv['amount']}"
+    # Only query private customer records when customer identity is verified
+    if is_verified and cust_id is not None:
+        # 2. Extract Specific Order IDs (e.g. ORD-1001)
+        order_id_matches = re.findall(r'(?:ORD|ord)-\d+', raw_msg, re.IGNORECASE)
+        matched_orders = set([m.upper() for m in order_id_matches])
+        
+        for oid in matched_orders:
+            order_info = get_order(oid, customer_id=cust_id)
+            if order_info:
+                desc = f"Order {oid}: Status={order_info['status']}, Total=${order_info['total_amount']}, Placed={order_info['created_at'][:10]}"
                 tools_used.append({
-                    "name": "get_latest_customer_invoice",
+                    "name": "get_order",
                     "result": desc,
-                    "tool": "get_latest_customer_invoice",
+                    "tool": "get_order",
                     "data": desc
                 })
-        sub = get_subscription(cust_id)
-        if sub:
-            desc = f"Subscription: {sub['plan_name']} (Status: {sub['status']}, ${sub['monthly_rate']}/mo)"
-            tools_used.append({
-                "name": "get_subscription",
-                "result": desc,
-                "tool": "get_subscription",
-                "data": desc
-            })
+                
+        # If no specific order ID matched, check customer's latest order if inquiry is about orders
+        is_order_query = category == 'Order' or any(k in msg_lower for k in ['order', 'ship', 'track', 'অর্ডার', 'ডেলিভারি', 'পার্সেল'])
+        if not matched_orders and is_order_query:
+            latest_order = get_latest_customer_order(cust_id)
+            if latest_order:
+                desc = f"Latest Order {latest_order['order_id']}: Status={latest_order['status']}, Total=${latest_order['total_amount']}"
+                tools_used.append({
+                    "name": "get_latest_customer_order",
+                    "result": desc,
+                    "tool": "get_latest_customer_order",
+                    "data": desc
+                })
+
+        # 3. Extract Specific Invoice IDs (e.g. INV-9901)
+        invoice_id_matches = re.findall(r'(?:INV|inv)-\d+', raw_msg, re.IGNORECASE)
+        matched_invoices = set([m.upper() for m in invoice_id_matches])
+        
+        for iid in matched_invoices:
+            inv_info = get_invoice(iid, customer_id=cust_id)
+            if inv_info:
+                desc = f"Invoice {iid}: Status={inv_info['status']}, Amount=${inv_info['amount']}, Due={inv_info.get('due_date', 'N/A')}"
+                tools_used.append({
+                    "name": "get_invoice",
+                    "result": desc,
+                    "tool": "get_invoice",
+                    "data": desc
+                })
+                
+        # Check invoices & subscriptions for customer
+        is_billing_query = category in ['Billing', 'Subscription', 'Refund'] or any(k in msg_lower for k in ['invoice', 'bill', 'charge', 'sub', 'ইনভয়েস', 'বিল', 'পেমেন্ট', 'টাকা', 'রিফান্ড'])
+        if is_billing_query:
+            if not matched_invoices:
+                latest_inv = get_latest_customer_invoice(cust_id)
+                if latest_inv:
+                    desc = f"Latest Invoice {latest_inv['invoice_id']}: Status={latest_inv['status']}, Amount=${latest_inv['amount']}"
+                    tools_used.append({
+                        "name": "get_latest_customer_invoice",
+                        "result": desc,
+                        "tool": "get_latest_customer_invoice",
+                        "data": desc
+                    })
+            sub = get_subscription(cust_id)
+            if sub:
+                desc = f"Subscription: {sub['plan_name']} (Status: {sub['status']}, ${sub['monthly_rate']}/mo)"
+                tools_used.append({
+                    "name": "get_subscription",
+                    "result": desc,
+                    "tool": "get_subscription",
+                    "data": desc
+                })
             
     return {
         "rag_docs": doc_texts,

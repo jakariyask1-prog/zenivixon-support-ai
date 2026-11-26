@@ -14,6 +14,7 @@ class TicketState(TypedDict):
     
     # Verification
     customer_id: Optional[int]
+    customer_tier: Optional[str]
     is_verified: bool
     
     # Tools/RAG Context

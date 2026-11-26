@@ -1,5 +1,16 @@
-import React from 'react';
-import { User, AlertCircle, Bot, Activity, CheckCircle2, AlertTriangle, MessageSquare, ShieldAlert, Zap, Terminal } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  User,
+  AlertCircle,
+  Bot,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+  MessageSquare,
+  ShieldAlert,
+  Zap,
+  Check
+} from 'lucide-react';
 
 export interface HandoffCustomer {
   email: string;
@@ -27,13 +38,19 @@ export interface HandoffTicket {
   recommendedAction?: string;
 }
 
-export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | null }) {
+interface HandoffPackageProps {
+  ticket: HandoffTicket | null;
+  onDismiss?: () => void;
+}
+
+export default function HandoffPackage({ ticket, onDismiss }: HandoffPackageProps) {
+  const [handoffCopied, setHandoffCopied] = useState(false);
+
   if (!ticket) return null;
 
-  // Smart Retention Logic (using backend computed values or high-fidelity fallback)
   const isEnterprise = ticket.customer.tier.toLowerCase() === 'enterprise';
   const isCritical = ticket.priority.toLowerCase() === 'critical';
-  
+
   let churnRiskScore = ticket.churnRiskScore ?? 35;
   if (ticket.churnRiskScore === undefined || ticket.churnRiskScore === null) {
     if (isCritical) churnRiskScore += 40;
@@ -48,9 +65,29 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
     ? "Critical Risk: Lead with empathy, confirm timeline under 2 hours, offer service credit upon resolution."
     : "Standard Tier: Acknowledge ticket, review recent account history, provide clear ETA.");
 
+  const handleCopyHandoffBrief = async () => {
+    const summary = [
+      `--- ZENIVIXON HUMAN ESCALATION BRIEF ---`,
+      `Customer: ${ticket.customer.email} (${ticket.customer.tier} tier, ${ticket.customer.isVerified ? 'Verified' : 'Unverified'})`,
+      `Category: ${ticket.category} | Priority: ${ticket.priority} | Churn Risk: ${churnRiskScore}%`,
+      `Intent: ${ticket.intent}`,
+      `Inquiry: "${ticket.rawMessage}"`,
+      `AI Findings: ${ticket.aiFindings}`,
+      `Escalation Reason: ${ticket.escalationReason}`,
+      `Recommended Action: ${retentionPoints}`,
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(summary);
+      setHandoffCopied(true);
+      setTimeout(() => setHandoffCopied(false), 2500);
+    } catch {
+      // Clipboard unavailable in restricted browser contexts
+    }
+  };
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-rose-500/30 bg-gradient-to-b from-rose-950/20 via-slate-900/80 to-slate-950/90 backdrop-blur-xl shadow-[0_12px_40px_-10px_rgba(244,63,94,0.15)] mt-6">
-      {/* Top Ambient Glow Line */}
       <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-rose-500 to-transparent opacity-80" />
 
       {/* Header */}
@@ -80,7 +117,7 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
       </div>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Customer & Issue */}
+        {/* Left Column */}
         <div className="space-y-5 lg:col-span-1 border-b lg:border-b-0 lg:border-r border-slate-800/80 pb-6 lg:pb-0 lg:pr-6">
           <div>
             <h4 className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2.5 flex items-center gap-1.5">
@@ -123,7 +160,7 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
           </div>
         </div>
 
-        {/* Right Column: AI Analysis & Handoff */}
+        {/* Right Column */}
         <div className="lg:col-span-2 space-y-5">
           <div>
             <h4 className="text-[10px] font-bold tracking-widest text-blue-400 uppercase mb-2 flex items-center gap-2">
@@ -146,7 +183,7 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <h4 className="text-[10px] font-bold tracking-widest text-slate-400 uppercase mb-2 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-emerald-400" /> Tools & API Context
+                <Activity className="w-3.5 h-3.5 text-emerald-400" /> Tools &amp; API Context
               </h4>
               <ul className="space-y-2">
                 {ticket.toolsExecuted.length > 0 ? (
@@ -172,7 +209,7 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
                 )}
               </ul>
             </div>
-            
+
             <div>
               <h4 className="text-[10px] font-bold tracking-widest text-rose-400 uppercase mb-2 flex items-center gap-1.5">
                 <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> Escalation Gate Trigger
@@ -184,11 +221,29 @@ export default function HandoffPackage({ ticket }: { ticket: HandoffTicket | nul
           </div>
 
           <div className="pt-4 border-t border-slate-800/80 flex flex-wrap justify-end gap-3">
-            <button className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all">
-              Dismiss
-            </button>
-            <button className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all flex items-center gap-2">
-              <MessageSquare className="w-3.5 h-3.5" /> Start Replying in Zendesk
+            {onDismiss && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              >
+                Dismiss
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleCopyHandoffBrief}
+              className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white hover:from-blue-500 hover:to-purple-500 rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all flex items-center gap-2"
+            >
+              {handoffCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-300" /> Handoff Brief Copied for Zendesk
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="w-3.5 h-3.5" /> Copy Brief &amp; Reply in Zendesk
+                </>
+              )}
             </button>
           </div>
         </div>

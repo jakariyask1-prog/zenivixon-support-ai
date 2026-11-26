@@ -24,29 +24,35 @@ def get_subscription(customer_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 def get_order(order_id: str, customer_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-    """Retrieve details for a specific order with tenant ownership validation."""
+    """Retrieve details for a specific order with strict tenant ownership validation."""
+    if customer_id is None:
+        return None
     with SessionLocal() as db:
-        query = db.query(Order).filter(Order.id == order_id)
-        if customer_id is not None:
-            query = query.filter(Order.customer_id == customer_id)
-        order = query.first()
+        order = db.query(Order).filter(
+            Order.id == order_id,
+            Order.customer_id == customer_id
+        ).first()
         if order:
             return {"status": order.status, "total_amount": order.total_amount, "created_at": order.created_at.isoformat()}
         return None
 
 def get_invoice(invoice_id: str, customer_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
-    """Retrieve details for a specific invoice with tenant ownership validation."""
+    """Retrieve details for a specific invoice with strict tenant ownership validation."""
+    if customer_id is None:
+        return None
     with SessionLocal() as db:
-        query = db.query(Invoice).filter(Invoice.id == invoice_id)
-        if customer_id is not None:
-            query = query.filter(Invoice.customer_id == customer_id)
-        invoice = query.first()
+        invoice = db.query(Invoice).filter(
+            Invoice.id == invoice_id,
+            Invoice.customer_id == customer_id
+        ).first()
         if invoice:
             return {"amount": invoice.amount, "status": invoice.status, "due_date": invoice.due_date.isoformat() if invoice.due_date else None}
         return None
 
 def get_latest_customer_order(customer_id: int) -> Optional[Dict[str, Any]]:
     """Retrieve the most recent order for a customer."""
+    if customer_id is None:
+        return None
     with SessionLocal() as db:
         order = db.query(Order).filter(Order.customer_id == customer_id).order_by(Order.created_at.desc()).first()
         if order:
@@ -55,17 +61,10 @@ def get_latest_customer_order(customer_id: int) -> Optional[Dict[str, Any]]:
 
 def get_latest_customer_invoice(customer_id: int) -> Optional[Dict[str, Any]]:
     """Retrieve the most recent invoice for a customer."""
+    if customer_id is None:
+        return None
     with SessionLocal() as db:
         invoice = db.query(Invoice).filter(Invoice.customer_id == customer_id).order_by(Invoice.due_date.desc()).first()
         if invoice:
             return {"invoice_id": invoice.id, "amount": invoice.amount, "status": invoice.status, "due_date": invoice.due_date.isoformat() if invoice.due_date else None}
         return None
-
-def check_service_status() -> Dict[str, Any]:
-    """Check the operational status of internal services."""
-    # Mocking a normal state, but could be modified to simulate outages.
-    return {
-        "api": "operational",
-        "web": "operational",
-        "database": "operational"
-    }

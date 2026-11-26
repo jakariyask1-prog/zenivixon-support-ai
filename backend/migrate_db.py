@@ -1,7 +1,7 @@
 import sqlite3
 import pathlib
 
-db_path = pathlib.Path(__file__).resolve().parent.parent / "logiflow_support.db"
+db_path = pathlib.Path(__file__).resolve().parent.parent / "zenivixon_support.db"
 print(f"Checking database at: {db_path}")
 
 conn = sqlite3.connect(db_path)
@@ -42,6 +42,7 @@ if "tickets" in tables:
         "escalation_reason": "TEXT",
         "recommended_action": "TEXT",
         "churn_risk_score": "INTEGER DEFAULT 20",
+        "processing_time_ms": "INTEGER",
         "resolved_at": "TIMESTAMP"
     }
     for col, col_type in expected_cols.items():
