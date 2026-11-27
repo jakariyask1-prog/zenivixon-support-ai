@@ -13,12 +13,12 @@
 ## 🌟 Key Highlights
 
 - **Dual-Portal Architecture**:
-  - **Public Customer Portal**: Submit inquiries with **real-time SSE pipeline streaming** and track live resolution status securely using Ticket ID + Email in **English & বাংলা (Bengali)**.
-  - **Protected Team Operations Console**: Environment-configured, timing-safe passcode-protected console featuring real-time KPIs, actual measured pipeline latency, dynamic portfolio risk health, 7-day trends, interactive scenario simulator, filterable ticket ledger, and a **Live Knowledge Base Manager**.
-- **Stateful LangGraph 6-Node Pipeline**: Processes tickets through intake classification, identity & tier verification, tenant-isolated tools + 30-chunk RAG retrieval, grounded resolution drafting, deterministic safety gating, and Zendesk escalation.
+  - **Public Customer Portal**: Submit inquiries with **real-time SSE pipeline streaming** (short-lived DB transactions) and track live resolution status securely using Ticket ID + Email in **English & বাংলা (Bengali)**.
+  - **Protected Team Operations Console**: Environment-configured, case-sensitive `hmac.compare_digest` passcode-protected console (plus an explicit read-only **Demo Preview Mode** for portfolio visitors) featuring real-time KPIs, measured latency, 7-day trends, scenario simulator, paginated ticket ledger, and a **Persistent Knowledge Base Manager**.
+- **Stateful LangGraph 6-Node Pipeline**: Processes tickets through intake classification, identity & tier verification, tenant-isolated tools + 30-chunk RAG retrieval, grounded resolution drafting, bilingual deterministic safety gating, and Zendesk escalation.
 - **Fast-Track Critical Escalation**: After executing tools so human agents have complete order/invoice context, Critical Priority or Angry sentiment tickets bypass LLM drafting and route directly to escalation with VIP/contextual retention advice.
-- **Zero-Downtime Resilient Fallback Engine**: Seamlessly falls back to SQLite (WAL mode), in-memory 30-chunk master KB search, and bilingual heuristic classification when external cloud services or LLM quotas are unavailable.
-- **Security Hardened**: Strict `customer_id` tenant isolation (IDOR prevention), `EmailStr` & length validation, per-IP sliding-window rate limiting, timing-safe admin auth (`hmac.compare_digest`), and HTTP timeouts on external calls.
+- **Zero-Downtime Resilient Fallback Engine**: Seamlessly falls back to SQLite (WAL mode), persistent relational `kb_articles` search (with Bengali-to-English semantic keyword bridging), and word-boundary heuristic classification when external cloud services or LLM quotas are unavailable.
+- **Security Hardened**: Strict `customer_id` + Order/Invoice ID verification on public endpoints (preventing IDOR & email impersonation), `EmailStr` & length validation, bounded per-IP & admin brute-force rate limiting, fail-closed production auth, and sanitized public drafts on escalated tickets.
 
 ---
 

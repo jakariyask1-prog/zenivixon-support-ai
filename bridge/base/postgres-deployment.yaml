@@ -31,7 +31,10 @@ spec:
                     - name: POSTGRES_DB
                       value: "zenivixon_db"
                     - name: POSTGRES_PASSWORD
-                      value: "password"
+                      valueFrom:
+                        secretKeyRef:
+                          name: postgres-credentials
+                          key: password
                     - name: POSTGRES_USER
                       value: "zenivixon"
                   ports:

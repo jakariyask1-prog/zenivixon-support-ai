@@ -2,6 +2,7 @@ import os
 import re
 import json
 import pathlib
+from typing import Optional
 from dotenv import load_dotenv
 
 env_file = pathlib.Path(__file__).resolve().parent.parent / ".env"
@@ -43,47 +44,113 @@ if GEMINI_KEY:
         print(f"[LLM Init Warning] Could not initialize ChatGoogleGenerativeAI: {err}")
         llm = None
 
+_BN_BOUNDARY = r'[\s,.;:!?\'\"()\[\]{}\-/|—।]'
+_BN_SUFFIXES = r'(?:ের|দের|গুলো|গুলি|টি|টা|কে|তে|য়|য়ে|ও)?'
+
+
+def _contains_any(msg_lower: str, keywords: list[str]) -> bool:
+    """Match keywords with strict word boundaries to prevent substring false positives in English & Bengali."""
+    for kw in keywords:
+        if not kw:
+            continue
+        is_bn = any(0x0980 <= ord(ch) <= 0x09FF for ch in kw)
+        if is_bn:
+            pattern = rf'(?:^|{_BN_BOUNDARY}){re.escape(kw)}{_BN_SUFFIXES}(?:$|{_BN_BOUNDARY})'
+        elif kw.endswith("-"):
+            pattern = rf'(?:^|\b){re.escape(kw)}'
+        else:
+            pattern = rf'\b{re.escape(kw)}\b'
+        if re.search(pattern, msg_lower):
+            return True
+    return False
+
+
 def _heuristic_classify(message: str) -> dict:
     """Fallback rule-based classifier when LLM is unavailable or rate-limited, with multilingual support (Bengali & English)."""
     msg_lower = message.lower()
-    
+
     # Priority
-    if any(w in msg_lower for w in ["cancel", "cancelling", "emergency", "lawyer", "জরুরি", "তাড়াতাড়ি", "ক্ষতি", "বন্ধ"]):
+    if _contains_any(msg_lower, [
+        "cancel", "canceling", "cancelling", "emergency", "lawyer", "lawsuit", "breach", "hacked",
+        "জরুরি", "তাড়াতাড়ি", "তাড়াতাড়ি", "ক্ষতি", "বন্ধ", "হ্যাক"
+    ]):
         priority = "Critical"
-    elif any(w in msg_lower for w in ["unacceptable", "urgent", "broken", "immediately", "died", "failed", "সমস্যা", "দেরি"]):
+    elif _contains_any(msg_lower, [
+        "unacceptable", "urgent", "broken", "immediately", "died", "failed", "overdue", "delayed",
+        "সমস্যা", "দেরি", "অবিলম্বে"
+    ]):
         priority = "High"
-    elif any(w in msg_lower for w in ["help", "question", "pricing", "cost", "how to", "services", "জানতে", "কি", "তথ্য"]):
+    elif _contains_any(msg_lower, [
+        "help", "question", "pricing", "cost", "how to", "services", "overview",
+        "জানতে", "কি", "কী", "কীভাবে", "কিভাবে", "তথ্য", "দাম"
+    ]):
         priority = "Low"
     else:
         priority = "Medium"
-    
-    # Category
-    if any(w in msg_lower for w in ["invoice", "charge", "refund", "card", "billing", "payment", "বিল", "ইনভয়েস", "টাকা", "রিফান্ড"]):
+
+    # Category (with dedicated Refund and Security detection)
+    if _contains_any(msg_lower, [
+        "security", "breach", "hacked", "hack", "phishing", "unauthorized", "vulnerability",
+        "সিকিউরিটি", "হ্যাক", "নিরাপত্তা"
+    ]):
+        category = "Security"
+    elif _contains_any(msg_lower, [
+        "invoice", "invoices", "charge", "charged", "card", "billing", "bill", "payment", "inv-",
+        "বিল", "ইনভয়েস", "ইনভয়েস", "পেমেন্ট"
+    ]):
         category = "Billing"
-    elif any(w in msg_lower for w in ["order", "shipped", "shipping", "delivery", "track", "ord-", "অর্ডার", "ডেলিভারি", "পার্সেল"]):
+    elif _contains_any(msg_lower, [
+        "refund", "refunds", "chargeback", "reimburse", "money back",
+        "রিফান্ড", "টাকা ফেরত", "ফেরত চাই"
+    ]):
+        category = "Refund"
+    elif _contains_any(msg_lower, ["টাকা"]):
+        category = "Billing"
+    elif _contains_any(msg_lower, [
+        "order", "orders", "ship", "shipped", "shipping", "shipment", "delivery", "track", "tracking", "ord-",
+        "অর্ডার", "ডেলিভারি", "পার্সেল"
+    ]):
         category = "Order"
-    elif any(w in msg_lower for w in ["password", "login", "auth", "account", "2fa", "পাসওয়ার্ড", "লগইন", "একাউন্ট"]):
+    elif _contains_any(msg_lower, [
+        "password", "login", "signin", "auth", "account", "2fa",
+        "পাসওয়ার্ড", "পাসওয়ার্ড", "লগইন", "একাউন্ট", "অ্যাকাউন্ট"
+    ]):
         category = "Account"
-    elif any(w in msg_lower for w in ["error", "bug", "crash", "sync", "failed", "died", "down", "api", "সার্ভিস", "ইরর"]):
+    elif _contains_any(msg_lower, [
+        "error", "errors", "bug", "bugs", "crash", "crashing", "sync", "failed", "died", "down", "api",
+        "সার্ভিস", "ইরর", "ক্র্যাশ"
+    ]):
         category = "Technical"
-    elif any(w in msg_lower for w in ["plan", "subscription", "upgrade", "প্ল্যান"]):
+    elif _contains_any(msg_lower, [
+        "plan", "plans", "subscription", "subscriptions", "upgrade", "downgrade",
+        "প্ল্যান", "সাবস্ক্রিপশন"
+    ]):
         category = "Subscription"
     else:
         category = "General"
-        
+
     # Sentiment
-    if any(w in msg_lower for w in ["unacceptable", "angry", "terrible", "worst", "cancelling", "hate", "ফালতু", "বাজে", "জঘন্য", "রাগান্বিত"]):
+    if _contains_any(msg_lower, [
+        "unacceptable", "angry", "terrible", "worst", "canceling", "cancelling", "hate", "demand",
+        "ফালতু", "বাজে", "জঘন্য", "রাগান্বিত"
+    ]):
         sentiment = "Angry"
-    elif any(w in msg_lower for w in ["frustrated", "delay", "slow", "problem", "broken", "died", "সমস্যা", "দেরি", "বিরক্ত"]):
+    elif _contains_any(msg_lower, [
+        "frustrated", "delay", "delayed", "slow", "problem", "broken", "died", "crashing",
+        "সমস্যা", "দেরি", "বিরক্ত"
+    ]):
         sentiment = "Frustrated"
-    elif any(w in msg_lower for w in ["thanks", "thank", "great", "love", "ধন্যবাদ", "ভালো"]):
+    elif _contains_any(msg_lower, [
+        "thanks", "thank", "great", "love", "awesome",
+        "ধন্যবাদ", "ভালো"
+    ]):
         sentiment = "Positive"
     else:
         sentiment = "Neutral"
-        
+
     words = message.split()[:5]
     intent = " ".join(words) if words else "Customer Support Inquiry"
-    
+
     return {
         "category": category,
         "intent": intent,
@@ -91,15 +158,16 @@ def _heuristic_classify(message: str) -> dict:
         "sentiment": sentiment
     }
 
+
 def intake_node(state: TicketState) -> dict:
     """Analyze intent, urgency, and sentiment with hybrid classification."""
     raw_msg = state.get('raw_message', '')
-    
+
     # Fast-path check: If LLM is not initialized, immediately use heuristic
     if not llm:
         fast_data = _heuristic_classify(raw_msg)
         return {
-            **fast_data, 
+            **fast_data,
             "agent_trace": [f"Intake complete (Fast-path/Fallback): {fast_data['priority']} priority, {fast_data['category']} category."]
         }
 
@@ -114,7 +182,7 @@ Respond with exactly this JSON structure:
   "priority": "<one of: Low, Medium, High, Critical>",
   "sentiment": "<one of: Positive, Neutral, Frustrated, Angry>"
 }}"""
-    
+
     used_fallback = False
     try:
         if not llm:
@@ -151,13 +219,14 @@ Respond with exactly this JSON structure:
         print(f"[Intake] LLM parse failed ({e}), using rule fallback.")
         used_fallback = True
         data = _heuristic_classify(state['raw_message'])
-        
+
     trace_msg = (
         f"Intake complete (LLM): {data['priority']} priority, {data['category']} category."
         if not used_fallback else
         f"Intake complete (Rule Fallback): {data['priority']} priority, {data['category']} category."
     )
     return {**data, "agent_trace": [trace_msg]}
+
 
 def verify_node(state: TicketState) -> dict:
     """Verify customer identity via DB."""
@@ -166,18 +235,19 @@ def verify_node(state: TicketState) -> dict:
     # A customer is only verified if already registered and marked active in DB
     if customer and customer.get("is_active", True):
         return {
-            "customer_id": customer["id"], 
+            "customer_id": customer["id"],
             "customer_tier": customer.get("tier", "standard"),
             "is_verified": True,
             "agent_trace": [f"Customer verified: ID {customer['id']}, Tier {customer.get('tier', 'standard')} ({customer.get('name', 'Customer')})."]
         }
     cust_id = customer["id"] if customer else None
     return {
-        "customer_id": cust_id, 
+        "customer_id": cust_id,
         "customer_tier": "standard",
         "is_verified": False,
         "agent_trace": [f"Unverified customer ticket recorded: {email}."]
     }
+
 
 def tool_execution_node(state: TicketState) -> dict:
     """Retrieve KB docs and relevant dynamic system data (Orders, Invoices, Subscriptions)."""
@@ -186,19 +256,22 @@ def tool_execution_node(state: TicketState) -> dict:
     category = state.get('category', '')
     cust_id = state.get('customer_id')
     is_verified = bool(state.get('is_verified', False))
-    
+    # Public portal submissions pass trusted_session=False so email-only callers must supply matching ORD-/INV- IDs
+    trusted_val = state.get('trusted_session')
+    is_trusted = True if trusted_val is None else bool(trusted_val)
+
     # 1. Search Knowledge Base (always available for all inquiries)
     docs = search_kb(raw_msg)
     doc_texts = [d['text'] for d in docs]
-    
+
     tools_used = []
-    
+
     # Only query private customer records when customer identity is verified
     if is_verified and cust_id is not None:
-        # 2. Extract Specific Order IDs (e.g. ORD-1001)
-        order_id_matches = re.findall(r'(?:ORD|ord)-\d+', raw_msg, re.IGNORECASE)
-        matched_orders = set([m.upper() for m in order_id_matches])
-        
+        # 2. Extract Specific Order IDs (e.g. ORD-1001) — requires both matching customer_id and exact Order ID
+        order_id_matches = re.findall(r'\b(?:ORD|ord)-\d+\b', raw_msg, re.IGNORECASE)
+        matched_orders = sorted({m.upper() for m in order_id_matches})
+
         for oid in matched_orders:
             order_info = get_order(oid, customer_id=cust_id)
             if order_info:
@@ -209,10 +282,13 @@ def tool_execution_node(state: TicketState) -> dict:
                     "tool": "get_order",
                     "data": desc
                 })
-                
-        # If no specific order ID matched, check customer's latest order if inquiry is about orders
-        is_order_query = category == 'Order' or any(k in msg_lower for k in ['order', 'ship', 'track', 'অর্ডার', 'ডেলিভারি', 'পার্সেল'])
-        if not matched_orders and is_order_query:
+
+        # Account-wide latest order lookup is restricted to trusted/authenticated sessions
+        is_order_query = category == 'Order' or _contains_any(msg_lower, [
+            'order', 'orders', 'ship', 'shipped', 'shipping', 'shipment', 'track', 'tracking',
+            'অর্ডার', 'ডেলিভারি', 'পার্সেল'
+        ])
+        if is_trusted and not matched_orders and is_order_query:
             latest_order = get_latest_customer_order(cust_id)
             if latest_order:
                 desc = f"Latest Order {latest_order['order_id']}: Status={latest_order['status']}, Total=${latest_order['total_amount']}"
@@ -223,10 +299,10 @@ def tool_execution_node(state: TicketState) -> dict:
                     "data": desc
                 })
 
-        # 3. Extract Specific Invoice IDs (e.g. INV-9901)
-        invoice_id_matches = re.findall(r'(?:INV|inv)-\d+', raw_msg, re.IGNORECASE)
-        matched_invoices = set([m.upper() for m in invoice_id_matches])
-        
+        # 3. Extract Specific Invoice IDs (e.g. INV-9901) — requires both matching customer_id and exact Invoice ID
+        invoice_id_matches = re.findall(r'\b(?:INV|inv)-\d+\b', raw_msg, re.IGNORECASE)
+        matched_invoices = sorted({m.upper() for m in invoice_id_matches})
+
         for iid in matched_invoices:
             inv_info = get_invoice(iid, customer_id=cust_id)
             if inv_info:
@@ -237,10 +313,13 @@ def tool_execution_node(state: TicketState) -> dict:
                     "tool": "get_invoice",
                     "data": desc
                 })
-                
-        # Check invoices & subscriptions for customer
-        is_billing_query = category in ['Billing', 'Subscription', 'Refund'] or any(k in msg_lower for k in ['invoice', 'bill', 'charge', 'sub', 'ইনভয়েস', 'বিল', 'পেমেন্ট', 'টাকা', 'রিফান্ড'])
-        if is_billing_query:
+
+        # Account-wide latest invoice & subscription lookups are restricted to trusted/authenticated sessions
+        is_billing_query = category in ['Billing', 'Subscription', 'Refund'] or _contains_any(msg_lower, [
+            'invoice', 'invoices', 'bill', 'billing', 'charge', 'subscription', 'subscriptions', 'plan', 'refund',
+            'ইনভয়েস', 'ইনভয়েস', 'বিল', 'পেমেন্ট', 'টাকা', 'রিফান্ড', 'সাবস্ক্রিপশন', 'প্ল্যান'
+        ])
+        if is_trusted and is_billing_query:
             if not matched_invoices:
                 latest_inv = get_latest_customer_invoice(cust_id)
                 if latest_inv:
@@ -260,18 +339,41 @@ def tool_execution_node(state: TicketState) -> dict:
                     "tool": "get_subscription",
                     "data": desc
                 })
-            
+
     return {
         "rag_docs": doc_texts,
         "tool_outputs": tools_used,
         "agent_trace": [f"Tools executed: {len(tools_used)} system data queries, {len(doc_texts)} KB docs retrieved."]
     }
 
+
+_ESCALATION_PHRASES = (
+    "i cannot resolve this",
+    "escalated this ticket",
+    "support specialist has been notified",
+    "স্বয়ংক্রিয়ভাবে সমাধান করতে পারছি না",
+    "স্বয়ংক্রিয়ভাবে সমাধান করতে পারছি না",
+    "সিনিয়র ইঞ্জিনিয়ার",
+    "সাপোর্ট স্পেশালিস্ট",
+    "এসকেলেট করা হয়েছে",
+    "এসকেলেট করা হয়েছে",
+)
+
+
+def _detect_escalation_signal(text: Optional[str]) -> bool:
+    if not text:
+        return False
+    lowered = text.lower()
+    if "[escalate_required]" in lowered:
+        return True
+    return any(phrase in lowered for phrase in _ESCALATION_PHRASES)
+
+
 def resolution_engine_node(state: TicketState) -> dict:
     """Draft a response based on tools and RAG with multilingual & fallback support."""
     context = "\n".join(state.get('rag_docs', []))
     tools_data = json.dumps(state.get('tool_outputs', []))
-    
+
     prompt = f"""
 You are ZENIVIXON Autonomous Support AI Assistant.
 Default Language: English (Global).
@@ -285,10 +387,11 @@ Instructions:
 1. Default to English for international inquiries. If the customer wrote in Bengali, reply warmly and politely in fluent Bengali. Otherwise, reply in professional English.
 2. If live system data contains specific order or invoice records (e.g., status, order ID, amount), clearly communicate this status to the customer.
 3. If Knowledge Base context provides the answer (e.g., company overview, services, policies), clearly explain ZENIVIXON's capabilities and guidance.
-4. For custom enterprise engineering, bespoke integrations (e.g. enterprise RAG pipelines, custom software), or inquiries needing tailored architectural design, provide a helpful summary of ZENIVIXON's relevant capabilities and state: "I cannot resolve this automatically as custom architectural design requires review by our senior engineering team. I have escalated this ticket to our solutions team to follow up with you."
-5. If the request is completely outside your knowledge base and no system data is available, respond with: "I cannot resolve this automatically. A support specialist has been notified."
+4. For custom enterprise engineering, bespoke integrations (e.g. enterprise RAG pipelines, custom software), or inquiries needing tailored architectural design, provide a helpful summary of ZENIVIXON's relevant capabilities, explain that senior engineering review is needed (in the customer's language), and append the exact tag [ESCALATE_REQUIRED] at the end.
+5. If the request is completely outside your knowledge base and no system data is available, state politely that a support specialist has been notified (in the customer's language) and append the exact tag [ESCALATE_REQUIRED] at the end.
 """
-    
+
+    needs_human_review = False
     try:
         if not llm:
             raise ValueError("LLM is not initialized (missing API key or client)")
@@ -298,14 +401,17 @@ Instructions:
             draft = " ".join([i.get("text", "") for i in raw_draft if isinstance(i, dict) and "text" in i])
         else:
             draft = str(raw_draft)
+
+        needs_human_review = _detect_escalation_signal(draft)
+        draft = re.sub(r'\s*\[ESCALATE_REQUIRED\]\s*', '', draft, flags=re.IGNORECASE).strip()
         findings = "Analyzed KB context and internal system records to formulate grounded response."
         trace_msg = "AI Resolution Engine drafted response using Gemini."
-    except Exception as e:
+    except Exception:
         # Graceful fallback when LLM is unavailable
         rag_docs = state.get('rag_docs', [])
         tool_outputs = state.get('tool_outputs', [])
-        is_bengali = any(ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in state.get('raw_message', ''))
-        
+        is_bengali = any(0x0980 <= ord(char) <= 0x09FF for char in state.get('raw_message', ''))
+
         if tool_outputs:
             tool_summary = "; ".join([t.get('result', '') for t in tool_outputs])
             if is_bengali:
@@ -320,15 +426,21 @@ Instructions:
                 draft = f"Thank you for contacting ZENIVIXON Support.\n\nAccording to our documentation:\n{rag_docs[0]}\n\nPlease let us know if you need additional assistance."
             findings = "Retrieved grounded documentation from Qdrant knowledge base."
         else:
-            draft = "I cannot resolve this automatically. A support specialist has been notified."
+            needs_human_review = True
+            if is_bengali:
+                draft = "আমি এটি স্বয়ংক্রিয়ভাবে সমাধান করতে পারছি না। আমাদের একজন সাপোর্ট স্পেশালিস্টকে বিষয়টি জানানো হয়েছে।"
+            else:
+                draft = "I cannot resolve this automatically. A support specialist has been notified."
             findings = "Autonomous resolution deferred: insufficient context or model quota reached."
         trace_msg = "AI Resolution Engine drafted response using grounded fallback."
-    
+
     return {
         "draft_response": draft,
         "ai_findings": findings,
+        "needs_human_review": needs_human_review,
         "agent_trace": [trace_msg]
     }
+
 
 def calculate_churn_risk(state: TicketState) -> tuple[int, str]:
     """Calculate quantitative Churn Risk % and generate contextual retention advice."""
@@ -336,29 +448,29 @@ def calculate_churn_risk(state: TicketState) -> tuple[int, str]:
     priority = state.get("priority", "Medium")
     sentiment = state.get("sentiment", "Neutral")
     category = state.get("category", "General")
-    
+
     score = 20
     if priority == "Critical":
         score += 40
     elif priority == "High":
         score += 20
-        
+
     if sentiment == "Angry":
         score += 25
     elif sentiment == "Frustrated":
         score += 15
-        
+
     if tier == "enterprise":
         score += 15
-        
+
     if category in ["Billing", "Refund"]:
         score += 10
-        
+
     score = min(max(score, 5), 98)
-    
+
     # Language detection: Default to English, adapt to Bengali if message is in Bengali
-    is_bengali = any(ord(char) >= 0x0980 and ord(char) <= 0x09FF for char in state.get('raw_message', ''))
-    
+    is_bengali = any(0x0980 <= ord(char) <= 0x09FF for char in state.get('raw_message', ''))
+
     if is_bengali:
         if tier == "enterprise":
             recommendation = "এন্টারপ্রাইজ ক্লায়েন্ট (VIP Account): সর্বোচ্চ অগ্রাধিকার দিন, সিনিয়র সাপোর্ট লিড নিয়োগ করুন এবং ২০% SLA ক্রেডিট অফার করুন।"
@@ -378,29 +490,41 @@ def calculate_churn_risk(state: TicketState) -> tuple[int, str]:
             recommendation = "High Priority: Expedite with Tier-2 engineering and deliver resolution within 1 business day."
         else:
             recommendation = "Standard Priority: Provide standard troubleshooting documentation and friendly confirmation."
-        
+
     return score, recommendation
+
+
+SENSITIVE_CATEGORIES = {"Billing", "Refund", "Subscription", "Account", "Security"}
+PRIVATE_LOOKUP_CATEGORIES = {"Order", "Billing", "Refund", "Subscription", "Account", "Security"}
+
 
 def safety_gate_node(state: TicketState) -> dict:
     """Deterministic policy gate. Rules = Authority."""
     is_safe = True
     reason = None
-    
+
     churn_score, recommendation = calculate_churn_risk(state)
-    
+    trusted_val = state.get("trusted_session")
+    is_trusted = True if trusted_val is None else bool(trusted_val)
+    category = state.get("category") or "General"
+    has_verified_tool_match = len(state.get("tool_outputs") or []) > 0
+
     if state.get('priority') == 'Critical':
         is_safe = False
         reason = "Deterministic Rule: Critical priority tickets cannot be auto-resolved."
     elif state.get('sentiment') == 'Angry':
         is_safe = False
         reason = "Deterministic Rule: Angry sentiment requires human empathy."
-    elif not state.get('is_verified', False) and state.get('category') in ['Billing', 'Account', 'Security']:
+    elif not state.get('is_verified', False) and category in SENSITIVE_CATEGORIES:
         is_safe = False
         reason = "Deterministic Rule: Unverified user asking for sensitive category."
-    elif "I cannot resolve this" in (state.get('draft_response') or ''):
+    elif not is_trusted and not has_verified_tool_match and category in PRIVATE_LOOKUP_CATEGORIES:
         is_safe = False
-        reason = "AI Rule: Insufficient context to resolve."
-        
+        reason = "Security Policy: Specific Order/Invoice ID verification required on public portal before disclosing account records."
+    elif state.get("needs_human_review") or _detect_escalation_signal(state.get('draft_response')):
+        is_safe = False
+        reason = "AI Rule: Insufficient context or specialist engineering review required."
+
     return {
         "is_safe": is_safe,
         "escalation_reason": reason,
@@ -408,6 +532,7 @@ def safety_gate_node(state: TicketState) -> dict:
         "recommended_action": recommendation,
         "agent_trace": [f"Safety Gate evaluated: Safe={is_safe}. Reason={reason}"]
     }
+
 
 def escalation_node(state: TicketState) -> dict:
     """Handoff package to Zendesk with Churn Risk prediction."""

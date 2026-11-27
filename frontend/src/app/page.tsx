@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, RefreshCw, BarChart3, Inbox, BookOpen } from 'lucide-react';
+import { ArrowLeft, RefreshCw, BarChart3, Inbox, BookOpen, Eye, LogOut } from 'lucide-react';
 import Header from '@/components/Header';
 import CustomerPortal from '@/components/CustomerPortal';
 import TeamDashboard from '@/components/TeamDashboard';
@@ -11,24 +11,37 @@ import TicketInspectorModal from '@/components/TicketInspectorModal';
 import PasscodeModal from '@/components/PasscodeModal';
 import { Language, TRANSLATIONS } from '@/lib/translations';
 import { DashboardStats, TicketListItem, TicketDetailModalData } from '@/types/support';
+import {
+  resolveApiBase,
+  isJsonResponse,
+  DEMO_PREVIEW_STATS,
+  DEMO_PREVIEW_TICKETS,
+  buildDemoTicketDetail,
+} from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+const TICKET_PAGE_SIZE = 20;
 
 export default function App() {
+  const [apiBase, setApiBase] = useState<string>(() => process.env.NEXT_PUBLIC_API_URL?.trim() || '');
   const [lang, setLang] = useState<Language>('en');
   const [viewMode, setViewMode] = useState<'customer' | 'team'>('customer');
 
-  // Team Console Auth State
+  // Team Console Auth & Explicit Demo Preview State
   const [isTeamAuthenticated, setIsTeamAuthenticated] = useState(false);
+  const [isDemoPreview, setIsDemoPreview] = useState(false);
   const [adminPasscode, setAdminPasscode] = useState('');
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
 
-  // Team Console Data State
+  // Team Console Data & Pagination State
   const [activeTeamTab, setActiveTeamTab] = useState<'dashboard' | 'tickets' | 'kb'>('dashboard');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
+  const [totalTicketCount, setTotalTicketCount] = useState(0);
+  const [ticketPage, setTicketPage] = useState(0);
+  const [ledgerStatusFilter, setLedgerStatusFilter] = useState('all');
+  const [ledgerCategoryFilter, setLedgerCategoryFilter] = useState('all');
   const [refreshingTickets, setRefreshingTickets] = useState(false);
 
   // Ticket Inspector Modal State
@@ -52,42 +65,70 @@ export default function App() {
     const code = pass ?? adminPasscode;
     if (!code) return;
     try {
-      const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
+      const res = await fetch(`${apiBase}/api/dashboard/stats`, {
         headers: { 'X-Admin-Passcode': code },
       });
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         const data: DashboardStats = await res.json();
         setStats(data);
       }
     } catch (e) {
       console.error('Failed to fetch stats', e);
     }
-  }, [adminPasscode]);
+  }, [adminPasscode, apiBase]);
 
-  const fetchTickets = useCallback(async (pass?: string) => {
-    const code = pass ?? adminPasscode;
-    if (!code) return;
-    setRefreshingTickets(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/tickets?limit=50`, {
-        headers: { 'X-Admin-Passcode': code },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTickets(data.tickets || []);
+  const fetchTickets = useCallback(
+    async (
+      opts?: {
+        pass?: string;
+        page?: number;
+        status?: string;
+        category?: string;
       }
-    } catch (e) {
-      console.error('Failed to fetch tickets', e);
-    } finally {
-      setRefreshingTickets(false);
-    }
-  }, [adminPasscode]);
+    ) => {
+      const code = opts?.pass ?? adminPasscode;
+      if (!code) return;
+      const targetPage = opts?.page ?? ticketPage;
+      const targetStatus = opts?.status ?? ledgerStatusFilter;
+      const targetCategory = opts?.category ?? ledgerCategoryFilter;
 
-  // Restore saved language & admin session on mount without synchronous setState in effect body
+      const params = new URLSearchParams({
+        limit: String(TICKET_PAGE_SIZE),
+        offset: String(targetPage * TICKET_PAGE_SIZE),
+      });
+      if (targetStatus !== 'all') {
+        params.set('status', targetStatus);
+      }
+      if (targetCategory !== 'all') {
+        params.set('category', targetCategory);
+      }
+
+      setRefreshingTickets(true);
+      try {
+        const res = await fetch(`${apiBase}/api/tickets?${params.toString()}`, {
+          headers: { 'X-Admin-Passcode': code },
+        });
+        if (res.ok && isJsonResponse(res)) {
+          const data = await res.json();
+          setTickets(data.tickets || []);
+          setTotalTicketCount(typeof data.total === 'number' ? data.total : (data.tickets || []).length);
+        }
+      } catch (e) {
+        console.error('Failed to fetch tickets', e);
+      } finally {
+        setRefreshingTickets(false);
+      }
+    },
+    [adminPasscode, apiBase, ticketPage, ledgerStatusFilter, ledgerCategoryFilter]
+  );
+
+  // Restore saved language, resolve runtime API base, and verify saved admin session on mount
   useEffect(() => {
     let cancelled = false;
     Promise.resolve().then(() => {
       if (cancelled) return;
+      const resolvedBase = resolveApiBase();
+      setApiBase(resolvedBase);
       try {
         const savedLang = localStorage.getItem('zenivixon_lang') as Language | null;
         if (savedLang === 'en' || savedLang === 'bn') {
@@ -107,28 +148,38 @@ export default function App() {
     };
   }, []);
 
-  // Fetch team data whenever adminPasscode is set
+  // Sync live team data whenever adminPasscode or pagination/filter state changes
   useEffect(() => {
-    if (!adminPasscode) return;
+    if (!adminPasscode || isDemoPreview) return;
     let cancelled = false;
     (async () => {
       try {
+        const params = new URLSearchParams({
+          limit: String(TICKET_PAGE_SIZE),
+          offset: String(ticketPage * TICKET_PAGE_SIZE),
+        });
+        if (ledgerStatusFilter !== 'all') params.set('status', ledgerStatusFilter);
+        if (ledgerCategoryFilter !== 'all') params.set('category', ledgerCategoryFilter);
+
         const [statsRes, ticketsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/dashboard/stats`, {
+          fetch(`${apiBase}/api/dashboard/stats`, {
             headers: { 'X-Admin-Passcode': adminPasscode },
           }),
-          fetch(`${API_BASE}/api/tickets?limit=50`, {
+          fetch(`${apiBase}/api/tickets?${params.toString()}`, {
             headers: { 'X-Admin-Passcode': adminPasscode },
           }),
         ]);
         if (cancelled) return;
-        if (statsRes.ok) {
+        if (statsRes.ok && isJsonResponse(statsRes)) {
           const statsData: DashboardStats = await statsRes.json();
           setStats(statsData);
         }
-        if (ticketsRes.ok) {
+        if (ticketsRes.ok && isJsonResponse(ticketsRes)) {
           const ticketsData = await ticketsRes.json();
           setTickets(ticketsData.tickets || []);
+          setTotalTicketCount(
+            typeof ticketsData.total === 'number' ? ticketsData.total : (ticketsData.tickets || []).length
+          );
         }
       } catch (e) {
         console.error('Failed to sync team data', e);
@@ -137,10 +188,10 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [adminPasscode]);
+  }, [adminPasscode, apiBase, isDemoPreview, ticketPage, ledgerStatusFilter, ledgerCategoryFilter]);
 
   const handleTeamAccessClick = () => {
-    if (isTeamAuthenticated) {
+    if (isTeamAuthenticated || isDemoPreview) {
       setViewMode('team');
     } else {
       setShowPasscodeModal(true);
@@ -149,21 +200,35 @@ export default function App() {
     }
   };
 
-  const unlockWithOfflineDemoFallback = (cleanPass: string): boolean => {
-    const normalized = cleanPass.toLowerCase();
-    if (normalized === 'zenivixon-2026' || normalized === 'zenivixon-admin-2026') {
-      setIsTeamAuthenticated(true);
-      setAdminPasscode(cleanPass);
-      try {
-        sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
-      } catch {
-        // ignore
-      }
-      setShowPasscodeModal(false);
-      setViewMode('team');
-      return true;
+  const handleEnterDemoPreview = () => {
+    setIsDemoPreview(true);
+    setIsTeamAuthenticated(false);
+    setAdminPasscode('');
+    setStats(DEMO_PREVIEW_STATS);
+    setTickets(DEMO_PREVIEW_TICKETS);
+    setTotalTicketCount(DEMO_PREVIEW_TICKETS.length);
+    setTicketPage(0);
+    setShowPasscodeModal(false);
+    setPasscodeError(false);
+    setViewMode('team');
+  };
+
+  const handleLogoutTeam = () => {
+    setIsTeamAuthenticated(false);
+    setIsDemoPreview(false);
+    setAdminPasscode('');
+    setStats(null);
+    setTickets([]);
+    setTotalTicketCount(0);
+    setTicketPage(0);
+    setSelectedTicketId(null);
+    setTicketDetail(null);
+    try {
+      sessionStorage.removeItem('zenivixon_admin_passcode');
+    } catch {
+      // ignore
     }
-    return false;
+    setViewMode('customer');
   };
 
   const handleVerifyPasscode = async (e: React.FormEvent) => {
@@ -174,15 +239,16 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
+      const res = await fetch(`${apiBase}/api/dashboard/stats`, {
         headers: { 'X-Admin-Passcode': cleanPass },
       });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
+      if (res.ok && isJsonResponse(res)) {
         const data: DashboardStats = await res.json();
         setStats(data);
+        setIsDemoPreview(false);
         setIsTeamAuthenticated(true);
         setAdminPasscode(cleanPass);
+        setTicketPage(0);
         try {
           sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
         } catch {
@@ -190,27 +256,31 @@ export default function App() {
         }
         setShowPasscodeModal(false);
         setViewMode('team');
-      } else if (res.status === 401 || res.status === 403) {
-        setPasscodeError(true);
-      } else if (!unlockWithOfflineDemoFallback(cleanPass)) {
+      } else {
         setPasscodeError(true);
       }
     } catch {
-      if (!unlockWithOfflineDemoFallback(cleanPass)) {
-        setPasscodeError(true);
-      }
+      setPasscodeError(true);
     }
   };
 
   const openTicketDetail = async (id: number) => {
+    if (isDemoPreview) {
+      const found = DEMO_PREVIEW_TICKETS.find(item => item.id === id);
+      if (found) {
+        setSelectedTicketId(id);
+        setTicketDetail(buildDemoTicketDetail(found));
+      }
+      return;
+    }
     if (!adminPasscode) return;
     setSelectedTicketId(id);
     setLoadingDetail(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets/${id}`, {
+      const res = await fetch(`${apiBase}/api/tickets/${id}`, {
         headers: { 'X-Admin-Passcode': adminPasscode },
       });
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         const data: TicketDetailModalData = await res.json();
         setTicketDetail(data);
       }
@@ -222,10 +292,10 @@ export default function App() {
   };
 
   const handleUpdateStatus = async (id: number, newStatus: string) => {
-    if (!adminPasscode) return;
+    if (isDemoPreview || !adminPasscode) return;
     setUpdatingStatus(true);
     try {
-      const res = await fetch(`${API_BASE}/api/tickets/${id}`, {
+      const res = await fetch(`${apiBase}/api/tickets/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -233,7 +303,7 @@ export default function App() {
         },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         fetchTickets();
         fetchStats();
         if (ticketDetail) {
@@ -248,6 +318,7 @@ export default function App() {
   };
 
   const refreshTeamData = () => {
+    if (isDemoPreview) return;
     fetchStats();
     fetchTickets();
   };
@@ -263,33 +334,60 @@ export default function App() {
         lang={lang}
         viewMode={viewMode}
         isTeamAuthenticated={isTeamAuthenticated}
+        isDemoPreview={isDemoPreview}
         onLanguageChange={handleLanguageChange}
         onSelectCustomer={() => setViewMode('customer')}
         onSelectTeam={handleTeamAccessClick}
+        onLogoutTeam={handleLogoutTeam}
       />
 
       {viewMode === 'customer' && (
         <CustomerPortal
           lang={lang}
-          apiBase={API_BASE}
+          apiBase={apiBase}
           onTicketSubmitted={isTeamAuthenticated ? refreshTeamData : undefined}
         />
       )}
 
       {viewMode === 'team' && (
         <div className="relative z-10 flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+          {isDemoPreview && (
+            <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-wrap items-center justify-between gap-3 text-xs text-cyan-200 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>
+                  <strong className="font-extrabold uppercase tracking-wider mr-2">{t.demoPreviewBadge}:</strong>
+                  {t.demoPreviewDesc}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasscodeModal(true);
+                  setPasscodeInput('');
+                  setPasscodeError(false);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-950/90 hover:bg-slate-900 text-cyan-300 border border-cyan-500/30 font-bold transition-all"
+              >
+                {t.passcodeSubmit}
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/[0.08] pb-5">
             <div>
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-purple-500/10 text-purple-400 border border-purple-500/30">
                   {t.internalOps}
                 </span>
-                <span className="text-xs text-slate-400">{t.authorizedSession}</span>
+                <span className="text-xs text-slate-400">
+                  {isDemoPreview ? t.demoPreviewBadge : t.authorizedSession}
+                </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white mt-1 tracking-tight">{t.telemetryTitle}</h2>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setViewMode('customer')}
@@ -299,15 +397,26 @@ export default function App() {
                 <span>{t.backCustomer}</span>
               </button>
 
+              {!isDemoPreview && (
+                <button
+                  type="button"
+                  onClick={refreshTeamData}
+                  disabled={refreshingTickets}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-all shadow-sm"
+                  title="Sync database records"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-cyan-400' : ''}`} />
+                  <span>{t.syncDb}</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={refreshTeamData}
-                disabled={refreshingTickets}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-all shadow-sm"
-                title="Sync database records"
+                onClick={handleLogoutTeam}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 transition-all shadow-sm"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshingTickets ? 'animate-spin text-cyan-400' : ''}`} />
-                <span>{t.syncDb}</span>
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{t.logoutConsole}</span>
               </button>
             </div>
           </div>
@@ -330,7 +439,9 @@ export default function App() {
               type="button"
               onClick={() => {
                 setActiveTeamTab('tickets');
-                fetchTickets();
+                if (!isDemoPreview) {
+                  fetchTickets();
+                }
               }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                 activeTeamTab === 'tickets'
@@ -340,7 +451,7 @@ export default function App() {
             >
               <Inbox className="w-4 h-4" />
               <span>
-                {t.inboundLedger} ({tickets.length})
+                {t.inboundLedger} ({totalTicketCount})
               </span>
             </button>
             <button
@@ -360,7 +471,9 @@ export default function App() {
           {activeTeamTab === 'dashboard' && (
             <TeamDashboard
               lang={lang}
-              apiBase={API_BASE}
+              apiBase={apiBase}
+              adminPasscode={adminPasscode}
+              isDemoPreview={isDemoPreview}
               stats={stats}
               tickets={tickets}
               onRefresh={refreshTeamData}
@@ -371,12 +484,30 @@ export default function App() {
             <TicketLedger
               lang={lang}
               tickets={tickets}
+              totalCount={totalTicketCount}
+              page={ticketPage}
+              pageSize={TICKET_PAGE_SIZE}
+              statusFilter={ledgerStatusFilter}
+              categoryFilter={ledgerCategoryFilter}
+              onStatusFilterChange={val => {
+                setLedgerStatusFilter(val);
+                setTicketPage(0);
+              }}
+              onCategoryFilterChange={val => {
+                setLedgerCategoryFilter(val);
+                setTicketPage(0);
+              }}
+              onPageChange={newPage => setTicketPage(newPage)}
               onInspectTicket={openTicketDetail}
             />
           )}
 
           {activeTeamTab === 'kb' && (
-            <KnowledgeBaseManager apiBase={API_BASE} adminPasscode={adminPasscode} />
+            <KnowledgeBaseManager
+              apiBase={apiBase}
+              adminPasscode={adminPasscode}
+              isDemoPreview={isDemoPreview}
+            />
           )}
         </div>
       )}
@@ -391,6 +522,7 @@ export default function App() {
           setPasscodeError(false);
         }}
         onSubmit={handleVerifyPasscode}
+        onEnterDemoPreview={handleEnterDemoPreview}
         onClose={() => setShowPasscodeModal(false)}
       />
 
@@ -400,6 +532,7 @@ export default function App() {
         ticketDetail={ticketDetail}
         loadingDetail={loadingDetail}
         updatingStatus={updatingStatus}
+        isDemoPreview={isDemoPreview}
         onClose={() => {
           setSelectedTicketId(null);
           setTicketDetail(null);

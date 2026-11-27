@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -18,14 +19,60 @@ import time
 
 from db.database import engine, Base, get_db, SessionLocal
 from db.models import Customer, Ticket
+from db.seed import ensure_kb_seeded
 from agents.graph import zenivixon_agent
 from core.qdrant_store import list_kb_documents, add_kb_document
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="ZENIVIXON Support API", version="2.0.0")
+DEV_DEFAULT_PASSCODES = {"zenivixon-2026", "zenivixon-admin-2026"}
 
-# Configurable CORS (defaults to "*" so Netlify / external frontends work out of the box unless restricted)
+
+def get_configured_admin_passcodes() -> set[str]:
+    """Return valid admin passcodes. Fails closed in production if ADMIN_PASSCODES is unset."""
+    raw = os.getenv("ADMIN_PASSCODES", "")
+    parsed = {p.strip() for p in raw.split(",") if p.strip()}
+    if parsed:
+        return parsed
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    if app_env == "production":
+        return set()
+    return set(DEV_DEFAULT_PASSCODES)
+
+
+def is_valid_admin_passcode(candidate_raw: Optional[str]) -> bool:
+    """Case-sensitive, timing-safe admin passcode verification."""
+    if not candidate_raw:
+        return False
+    valid_passcodes = get_configured_admin_passcodes()
+    if not valid_passcodes:
+        return False
+    candidate_bytes = candidate_raw.strip().encode("utf-8")
+    return any(
+        hmac.compare_digest(candidate_bytes, valid.encode("utf-8"))
+        for valid in valid_passcodes
+    )
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    ensure_kb_seeded()
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    if app_env == "production":
+        if os.getenv("ALLOWED_ORIGINS", "*").strip() == "*":
+            logger.warning("SECURITY WARNING: ALLOWED_ORIGINS='*' in production. Restrict origins to your frontend domain.")
+        if not get_configured_admin_passcodes():
+            logger.warning("SECURITY WARNING: ADMIN_PASSCODES is unset in production. Team Console endpoints are locked.")
+    yield
+
+
+# Ensure schema exists even if TestClient is instantiated without lifespan context
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="ZENIVIXON Support API", version="2.1.0", lifespan=lifespan)
+
+# Configurable CORS (defaults to "*" in dev so Netlify / external frontends work unless restricted)
 allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
 
@@ -36,48 +83,86 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-Admin-Passcode"],
 )
 
-# Admin Passcode / Security Dependency (env-driven, timing-safe)
-_raw_passcodes = os.getenv("ADMIN_PASSCODES", "")
-if not _raw_passcodes.strip():
-    ADMIN_PASSCODES = {"zenivixon-2026", "zenivixon-admin-2026"}
-else:
-    ADMIN_PASSCODES = {p.strip().lower() for p in _raw_passcodes.split(",") if p.strip()}
-
-
-def require_admin_auth(x_admin_passcode: Optional[str] = Header(None, alias="X-Admin-Passcode")):
-    """Validate administrative team passcode from header using timing-safe comparison."""
-    if not x_admin_passcode or not ADMIN_PASSCODES:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: Valid Team Console passcode required in X-Admin-Passcode header."
-        )
-    candidate = x_admin_passcode.strip().lower()
-    if not any(hmac.compare_digest(candidate, valid) for valid in ADMIN_PASSCODES):
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: Valid Team Console passcode required in X-Admin-Passcode header."
-        )
-    return True
-
-
-# Lightweight thread-safe sliding-window rate limiter for public endpoints
-RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+# Bounded thread-safe sliding-window rate limiters (public + admin brute-force protection)
+_MAX_TRACKED_IPS = 2048
 _rate_limit_lock = threading.Lock()
 _rate_limit_buckets: dict[str, deque[float]] = defaultdict(deque)
+_admin_fail_buckets: dict[str, deque[float]] = defaultdict(deque)
+
+
+def _extract_client_ip(request: Request) -> str:
+    if os.getenv("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes"}:
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            first_ip = forwarded.split(",")[0].strip()
+            if first_ip:
+                return first_ip
+    return request.client.host if request.client else "unknown"
+
+
+def _prune_buckets(store: dict[str, deque[float]], window_start: float) -> None:
+    if len(store) <= _MAX_TRACKED_IPS:
+        return
+    stale_ips = []
+    for ip, dq in store.items():
+        while dq and dq[0] < window_start:
+            dq.popleft()
+        if not dq:
+            stale_ips.append(ip)
+    for ip in stale_ips:
+        store.pop(ip, None)
+
+
+def require_admin_auth(
+    request: Request,
+    x_admin_passcode: Optional[str] = Header(None, alias="X-Admin-Passcode")
+):
+    """Validate administrative team passcode with brute-force rate limiting and timing-safe comparison."""
+    max_fails = int(os.getenv("ADMIN_AUTH_MAX_FAILS_PER_MINUTE", "10"))
+    client_ip = _extract_client_ip(request)
+    now = time.monotonic()
+    window_start = now - 60.0
+
+    with _rate_limit_lock:
+        _prune_buckets(_admin_fail_buckets, window_start)
+        fail_bucket = _admin_fail_buckets.get(client_ip)
+        if fail_bucket is not None:
+            while fail_bucket and fail_bucket[0] < window_start:
+                fail_bucket.popleft()
+            if not fail_bucket:
+                _admin_fail_buckets.pop(client_ip, None)
+            elif max_fails > 0 and len(fail_bucket) >= max_fails:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Too many failed authentication attempts. Please wait a minute before retrying."
+                )
+
+    if is_valid_admin_passcode(x_admin_passcode):
+        return True
+
+    with _rate_limit_lock:
+        _admin_fail_buckets[client_ip].append(now)
+
+    raise HTTPException(
+        status_code=401,
+        detail="Unauthorized: Valid Team Console passcode required in X-Admin-Passcode header."
+    )
 
 
 def check_rate_limit(request: Request):
-    """Enforce per-IP sliding-window rate limit on public endpoints."""
-    if RATE_LIMIT_PER_MINUTE <= 0:
+    """Enforce bounded per-IP sliding-window rate limit on public endpoints."""
+    limit_per_min = int(os.getenv("RATE_LIMIT_PER_MINUTE", "30"))
+    if limit_per_min <= 0:
         return
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = _extract_client_ip(request)
     now = time.monotonic()
     window_start = now - 60.0
     with _rate_limit_lock:
+        _prune_buckets(_rate_limit_buckets, window_start)
         bucket = _rate_limit_buckets[client_ip]
         while bucket and bucket[0] < window_start:
             bucket.popleft()
-        if len(bucket) >= RATE_LIMIT_PER_MINUTE:
+        if len(bucket) >= limit_per_min:
             raise HTTPException(
                 status_code=429,
                 detail="Rate limit exceeded. Please wait a minute before submitting more requests."
@@ -102,7 +187,7 @@ def health_check():
     return {
         "status": "online",
         "service": "ZENIVIXON Support AI",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -155,9 +240,6 @@ def deep_health_check(db: Session = Depends(get_db)):
     return health_results
 
 
-Base.metadata.create_all(bind=engine)
-
-
 class TicketRequest(BaseModel):
     email: EmailStr
     message: str = Field(..., min_length=3, max_length=2000)
@@ -169,83 +251,100 @@ class KBDocumentRequest(BaseModel):
     text: str = Field(..., min_length=10, max_length=5000)
 
 
-def _create_ticket_record(req: TicketRequest, db: Session) -> tuple[Customer, Ticket, dict]:
-    """Create or retrieve customer and persist initial processing ticket."""
+def _create_ticket_snapshot(req: TicketRequest, trusted_session: bool) -> tuple[dict, dict]:
+    """Create or retrieve customer and persist initial ticket in a short-lived DB transaction."""
     clean_email = str(req.email).strip().lower()
     clean_message = req.message.strip()
 
-    existing_customer = db.query(Customer).filter(func.lower(Customer.email) == clean_email).first()
-    is_verified_user = bool(existing_customer and existing_customer.is_active)
+    with SessionLocal() as db:
+        existing_customer = db.query(Customer).filter(func.lower(Customer.email) == clean_email).first()
+        is_verified_user = bool(existing_customer and existing_customer.is_active)
 
-    if not existing_customer:
-        name_part = clean_email.split("@")[0].replace(".", " ").title() if "@" in clean_email else "Customer"
-        customer = Customer(
-            email=clean_email,
-            name=name_part,
-            company="General",
-            tier="standard",
-            is_active=False  # Guest / unverified submission until confirmed
+        if not existing_customer:
+            name_part = clean_email.split("@")[0].replace(".", " ").title() if "@" in clean_email else "Customer"
+            customer = Customer(
+                email=clean_email,
+                name=name_part,
+                company="General",
+                tier="standard",
+                is_active=False  # Guest / unverified submission until confirmed
+            )
+            db.add(customer)
+            db.commit()
+            db.refresh(customer)
+        else:
+            customer = existing_customer
+
+        ticket = Ticket(
+            customer_id=customer.id,
+            customer_email=clean_email,
+            raw_message=clean_message,
+            resolution_status="processing"
         )
-        db.add(customer)
+        db.add(ticket)
         db.commit()
-        db.refresh(customer)
-    else:
-        customer = existing_customer
+        db.refresh(ticket)
 
-    ticket = Ticket(
-        customer_id=customer.id,
-        customer_email=clean_email,
-        raw_message=clean_message,
-        resolution_status="processing"
-    )
-    db.add(ticket)
-    db.commit()
-    db.refresh(ticket)
-
-    initial_state = {
-        "ticket_id": ticket.id,
-        "customer_email": clean_email,
-        "raw_message": clean_message,
-        "customer_id": customer.id,
-        "is_verified": is_verified_user,
-        "customer_tier": customer.tier or "standard",
-        "agent_trace": []
-    }
-    return customer, ticket, initial_state
+        customer_snapshot = {
+            "id": customer.id,
+            "email": clean_email,
+            "name": customer.name,
+            "tier": customer.tier or "standard",
+        }
+        initial_state = {
+            "ticket_id": ticket.id,
+            "customer_email": clean_email,
+            "raw_message": clean_message,
+            "customer_id": customer.id,
+            "is_verified": is_verified_user,
+            "trusted_session": trusted_session,
+            "customer_tier": customer.tier or "standard",
+            "agent_trace": []
+        }
+        return customer_snapshot, initial_state
 
 
-def _persist_and_format_ticket(
-    ticket: Ticket,
-    customer: Customer,
+def _persist_ticket_outcome(
+    ticket_id: int,
+    customer_snapshot: dict,
+    raw_message: str,
     final_state: dict,
     elapsed_ms: int,
-    db: Session
+    trusted_session: bool,
 ) -> dict:
-    """Persist LangGraph outcome to Ticket row and return standardized API payload."""
-    ticket.category = final_state.get("category")
-    ticket.intent = final_state.get("intent")
-    ticket.priority = final_state.get("priority")
-    ticket.sentiment = final_state.get("sentiment")
-    ticket.resolution_status = final_state.get("resolution_status", "open")
-    ticket.draft_response = final_state.get("draft_response")
-    ticket.ai_findings = final_state.get("ai_findings")
-    ticket.tools_executed = json.dumps(final_state.get("tool_outputs", []))
-    ticket.escalation_reason = final_state.get("escalation_reason")
-    ticket.recommended_action = final_state.get("recommended_action")
-    ticket.churn_risk_score = final_state.get("churn_risk_score", 20)
-    ticket.processing_time_ms = elapsed_ms
-    if ticket.resolution_status == "resolved":
-        ticket.resolved_at = datetime.now(timezone.utc)
+    """Persist LangGraph outcome in a short-lived DB session and sanitize public escalated drafts."""
+    status_val = final_state.get("resolution_status", "open")
+    internal_draft = final_state.get("draft_response")
 
-    db.commit()
+    with SessionLocal() as db:
+        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if ticket:
+            ticket.category = final_state.get("category")
+            ticket.intent = final_state.get("intent")
+            ticket.priority = final_state.get("priority")
+            ticket.sentiment = final_state.get("sentiment")
+            ticket.resolution_status = status_val
+            ticket.draft_response = internal_draft
+            ticket.ai_findings = final_state.get("ai_findings")
+            ticket.tools_executed = json.dumps(final_state.get("tool_outputs", []))
+            ticket.escalation_reason = final_state.get("escalation_reason")
+            ticket.recommended_action = final_state.get("recommended_action")
+            ticket.churn_risk_score = final_state.get("churn_risk_score", 20)
+            ticket.processing_time_ms = elapsed_ms
+            if status_val == "resolved":
+                ticket.resolved_at = datetime.now(timezone.utc)
+            db.commit()
+
+    # Suppress internal/partial draft from public callers when a ticket was blocked or escalated
+    public_draft = internal_draft if (trusted_session or status_val != "escalated") else None
 
     return {
-        "ticket_id": ticket.id,
-        "customer_email": ticket.customer_email,
-        "customer_name": customer.name,
-        "customer_tier": customer.tier,
-        "raw_message": ticket.raw_message,
-        "status": ticket.resolution_status,
+        "ticket_id": ticket_id,
+        "customer_email": customer_snapshot["email"],
+        "customer_name": customer_snapshot["name"],
+        "customer_tier": final_state.get("customer_tier") or customer_snapshot["tier"],
+        "raw_message": raw_message,
+        "status": status_val,
         "trace": final_state.get("agent_trace", []),
         "category": final_state.get("category"),
         "intent": final_state.get("intent"),
@@ -256,7 +355,7 @@ def _persist_and_format_ticket(
         "recommended_action": final_state.get("recommended_action"),
         "churn_risk_score": final_state.get("churn_risk_score", 20),
         "processing_time_ms": elapsed_ms,
-        "draft_response": final_state.get("draft_response"),
+        "draft_response": public_draft,
         "tools_executed": final_state.get("tool_outputs", []),
         "is_verified": bool(final_state.get("is_verified", False))
     }
@@ -265,11 +364,12 @@ def _persist_and_format_ticket(
 @app.post("/api/tickets")
 def submit_ticket(
     req: TicketRequest,
-    db: Session = Depends(get_db),
+    x_admin_passcode: Optional[str] = Header(None, alias="X-Admin-Passcode"),
     _: None = Depends(check_rate_limit)
 ):
     started_at = time.perf_counter()
-    customer, ticket, initial_state = _create_ticket_record(req, db)
+    trusted_session = is_valid_admin_passcode(x_admin_passcode)
+    customer_snapshot, initial_state = _create_ticket_snapshot(req, trusted_session=trusted_session)
 
     try:
         final_state = zenivixon_agent.invoke(initial_state)
@@ -283,7 +383,14 @@ def submit_ticket(
         ]
 
     elapsed_ms = max(1, int((time.perf_counter() - started_at) * 1000))
-    return _persist_and_format_ticket(ticket, customer, final_state, elapsed_ms, db)
+    return _persist_ticket_outcome(
+        ticket_id=initial_state["ticket_id"],
+        customer_snapshot=customer_snapshot,
+        raw_message=initial_state["raw_message"],
+        final_state=final_state,
+        elapsed_ms=elapsed_ms,
+        trusted_session=trusted_session,
+    )
 
 
 NODE_DISPLAY_LABELS = {
@@ -300,46 +407,56 @@ NODE_DISPLAY_LABELS = {
 @app.post("/api/tickets/stream")
 def submit_ticket_stream(
     req: TicketRequest,
+    x_admin_passcode: Optional[str] = Header(None, alias="X-Admin-Passcode"),
     _: None = Depends(check_rate_limit)
 ):
-    """Stream real-time LangGraph node execution progress via Server-Sent Events (SSE)."""
+    """Stream real-time LangGraph node execution progress via Server-Sent Events (SSE) without holding DB connections."""
+    trusted_session = is_valid_admin_passcode(x_admin_passcode)
+
     def event_generator():
         started_at = time.perf_counter()
-        with SessionLocal() as db:
-            customer, ticket, initial_state = _create_ticket_record(req, db)
-            merged_state = dict(initial_state)
-            accumulated_trace = list(initial_state.get("agent_trace", []))
+        customer_snapshot, initial_state = _create_ticket_snapshot(req, trusted_session=trusted_session)
+        ticket_id = initial_state["ticket_id"]
+        merged_state = dict(initial_state)
+        accumulated_trace = list(initial_state.get("agent_trace", []))
 
-            yield f"event: started\ndata: {json.dumps({'ticket_id': ticket.id})}\n\n"
+        yield f"event: started\ndata: {json.dumps({'ticket_id': ticket_id})}\n\n"
 
-            try:
-                for chunk in zenivixon_agent.stream(initial_state):
-                    for node_name, node_output in chunk.items():
-                        if isinstance(node_output, dict):
-                            node_trace = node_output.get("agent_trace")
-                            if node_trace:
-                                accumulated_trace.extend(node_trace)
-                            for k, v in node_output.items():
-                                if k != "agent_trace":
-                                    merged_state[k] = v
-                            merged_state["agent_trace"] = accumulated_trace
+        try:
+            for chunk in zenivixon_agent.stream(initial_state):
+                for node_name, node_output in chunk.items():
+                    if isinstance(node_output, dict):
+                        node_trace = node_output.get("agent_trace")
+                        if node_trace:
+                            accumulated_trace.extend(node_trace)
+                        for k, v in node_output.items():
+                            if k != "agent_trace":
+                                merged_state[k] = v
+                        merged_state["agent_trace"] = accumulated_trace
 
-                        event_payload = {
-                            "node": node_name,
-                            "label": NODE_DISPLAY_LABELS.get(node_name, node_name),
-                            "trace": node_output.get("agent_trace", []) if isinstance(node_output, dict) else [],
-                        }
-                        yield f"event: node\ndata: {json.dumps(event_payload)}\n\n"
-            except Exception as e:
-                logger.error(f"Streaming agent execution failed: {e}")
-                merged_state["resolution_status"] = "escalated"
-                merged_state["escalation_reason"] = "System Policy: Autonomous triage deferred to human engineering."
-                accumulated_trace.append("Autonomous triage deferred to senior engineer.")
-                merged_state["agent_trace"] = accumulated_trace
+                    event_payload = {
+                        "node": node_name,
+                        "label": NODE_DISPLAY_LABELS.get(node_name, node_name),
+                        "trace": node_output.get("agent_trace", []) if isinstance(node_output, dict) else [],
+                    }
+                    yield f"event: node\ndata: {json.dumps(event_payload)}\n\n"
+        except Exception as e:
+            logger.error(f"Streaming agent execution failed: {e}")
+            merged_state["resolution_status"] = "escalated"
+            merged_state["escalation_reason"] = "System Policy: Autonomous triage deferred to human engineering."
+            accumulated_trace.append("Autonomous triage deferred to senior engineer.")
+            merged_state["agent_trace"] = accumulated_trace
 
-            elapsed_ms = max(1, int((time.perf_counter() - started_at) * 1000))
-            final_payload = _persist_and_format_ticket(ticket, customer, merged_state, elapsed_ms, db)
-            yield f"event: done\ndata: {json.dumps(final_payload)}\n\n"
+        elapsed_ms = max(1, int((time.perf_counter() - started_at) * 1000))
+        final_payload = _persist_ticket_outcome(
+            ticket_id=ticket_id,
+            customer_snapshot=customer_snapshot,
+            raw_message=initial_state["raw_message"],
+            final_state=merged_state,
+            elapsed_ms=elapsed_ms,
+            trusted_session=trusted_session,
+        )
+        yield f"event: done\ndata: {json.dumps(final_payload)}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -442,6 +559,8 @@ def portal_track_ticket(
             detail=f"Ticket #{ticket_id} was not found for email '{email}'. Please check your Ticket ID and Email."
         )
 
+    public_draft = ticket.draft_response if ticket.resolution_status != "escalated" else None
+
     return {
         "id": ticket.id,
         "customer": {
@@ -456,7 +575,7 @@ def portal_track_ticket(
         "priority": ticket.priority or "Medium",
         "sentiment": ticket.sentiment or "Neutral",
         "status": ticket.resolution_status,
-        "draft_response": ticket.draft_response,
+        "draft_response": public_draft,
         "ai_findings": ticket.ai_findings,
         "processing_time_ms": ticket.processing_time_ms,
         "created_at": ticket.created_at.isoformat() if ticket.created_at else None,

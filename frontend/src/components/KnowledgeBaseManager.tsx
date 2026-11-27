@@ -1,17 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Plus, Search, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { BookOpen, Plus, Search, CheckCircle2, AlertCircle, RefreshCw, Eye } from 'lucide-react';
 import { KBDocument } from '@/types/support';
+import { DEMO_PREVIEW_KB_DOCS, isJsonResponse } from '@/lib/api';
 
 interface KnowledgeBaseManagerProps {
   apiBase: string;
   adminPasscode: string;
+  isDemoPreview?: boolean;
 }
 
-export default function KnowledgeBaseManager({ apiBase, adminPasscode }: KnowledgeBaseManagerProps) {
+export default function KnowledgeBaseManager({
+  apiBase,
+  adminPasscode,
+  isDemoPreview = false,
+}: KnowledgeBaseManagerProps) {
   const [docs, setDocs] = useState<KBDocument[]>([]);
-  const [loading, setLoading] = useState(Boolean(adminPasscode));
+  const [loading, setLoading] = useState(Boolean(adminPasscode && !isDemoPreview));
   const [search, setSearch] = useState('');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Services');
@@ -20,16 +26,18 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
-    if (!adminPasscode) return;
+    if (isDemoPreview || !adminPasscode) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(`${apiBase}/api/kb`, {
           headers: { 'X-Admin-Passcode': adminPasscode },
         });
-        if (!cancelled && res.ok) {
+        if (!cancelled && res.ok && isJsonResponse(res)) {
           const data = await res.json();
           setDocs(data.documents || []);
+        } else if (!cancelled) {
+          setFeedback({ type: 'error', message: 'Failed to load knowledge base documents from API.' });
         }
       } catch {
         if (!cancelled) {
@@ -44,10 +52,17 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
     return () => {
       cancelled = true;
     };
-  }, [apiBase, adminPasscode]);
+  }, [apiBase, adminPasscode, isDemoPreview]);
 
   const handleAddDoc = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDemoPreview) {
+      setFeedback({
+        type: 'error',
+        message: 'Read-Only Demo Preview Mode: Connect with an Admin Passphrase to ingest live Knowledge Base articles.',
+      });
+      return;
+    }
     if (!title.trim() || !text.trim() || !adminPasscode) return;
     setSubmitting(true);
     setFeedback(null);
@@ -60,7 +75,7 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
         },
         body: JSON.stringify({ title, category, text }),
       });
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         const created: KBDocument = await res.json();
         setDocs(prev => [created, ...prev]);
         setTitle('');
@@ -68,11 +83,11 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
         setFeedback({
           type: 'success',
           message: created.synced_to_qdrant
-            ? `Added "${created.title}" and synced vector embedding to Qdrant Cloud.`
-            : `Added "${created.title}" to runtime Knowledge Base (local resilient index).`,
+            ? `Added "${created.title}" to persistent DB and synced vector embedding to Qdrant.`
+            : `Added "${created.title}" to persistent relational Knowledge Base.`,
         });
       } else {
-        const err = await res.json().catch(() => ({}));
+        const err = isJsonResponse(res) ? await res.json().catch(() => ({})) : {};
         setFeedback({ type: 'error', message: typeof err.detail === 'string' ? err.detail : 'Failed to add document.' });
       }
     } catch {
@@ -82,7 +97,10 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
     }
   };
 
-  const filtered = docs.filter(d =>
+  const activeDocs = isDemoPreview ? DEMO_PREVIEW_KB_DOCS : docs;
+  const isLoading = !isDemoPreview && loading;
+
+  const filtered = activeDocs.filter(d =>
     d.title.toLowerCase().includes(search.toLowerCase()) ||
     d.category.toLowerCase().includes(search.toLowerCase()) ||
     d.text.toLowerCase().includes(search.toLowerCase())
@@ -160,10 +178,18 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {isDemoPreview ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-300">
+                <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                Read-Only in Demo Preview Mode
+              </span>
+            ) : (
+              <span />
+            )}
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || isDemoPreview}
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
             >
               {submitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -194,7 +220,7 @@ export default function KnowledgeBaseManager({ apiBase, adminPasscode }: Knowled
           </div>
         </div>
 
-        {loading ? (
+        {isLoading ? (
           <div className="py-10 text-center text-slate-400 text-xs">Loading knowledge base...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[460px] overflow-y-auto pr-1">

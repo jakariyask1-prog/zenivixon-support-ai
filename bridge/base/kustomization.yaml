@@ -13,7 +13,3 @@ resources:
     - qdrant-expose.yaml
     - qdrant-qdrant-data-persistentVolumeClaim.yaml
     - qdrant-service.yaml
-    - redis-deployment.yaml
-    - redis-expose.yaml
-    - redis-redis-data-persistentVolumeClaim.yaml
-    - redis-service.yaml

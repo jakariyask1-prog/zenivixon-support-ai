@@ -196,12 +196,18 @@ export const TRANSLATIONS = {
     quickChangeStatus: "Update Status:",
     closeBtn: "Close Inspector",
     
-    // Passcode Modal
+    // Passcode Modal & Demo Preview
     passcodeTitle: "Restricted Operations Console",
-    passcodeDesc: "Enter your team passphrase to access operations telemetry, internal metrics, and Zendesk queue.",
+    passcodeDesc: "Enter your team passphrase to access live operations telemetry, internal metrics, and Zendesk queue.",
     passcodePlaceholder: "Enter Team Passphrase",
     passcodeSubmit: "Unlock Console",
-    passcodeInvalid: "Invalid passphrase. Please verify your team credentials.",
+    passcodeInvalid: "Invalid passphrase or backend unreachable. Verify credentials or use Demo Preview.",
+    demoPreviewBtn: "Open Demo Preview Mode (Portfolio)",
+    demoPreviewBadge: "DEMO PREVIEW (READ-ONLY)",
+    demoPreviewDesc: "Explore portfolio telemetry & sample triage records without admin credentials.",
+    logoutConsole: "Exit Console",
+    pagePrev: "Previous",
+    pageNext: "Next",
     kbManager: "Knowledge Base"
   },
   bn: {
@@ -346,12 +352,18 @@ export const TRANSLATIONS = {
     quickChangeStatus: "স্ট্যাটাস আপডেট করুন:",
     closeBtn: "ইন্সপেক্টর বন্ধ করুন",
     
-    // Passcode Modal
+    // Passcode Modal & Demo Preview
     passcodeTitle: "সুরক্ষিত অপারেশনস কনসোল",
-    passcodeDesc: "অপারেশনস টেলিমেট্রি এবং জেনডেস্ক কিউ অ্যাক্সেস করতে টিম পাসকোড প্রবেশ করান।",
+    passcodeDesc: "লাইভ অপারেশনস টেলিমেট্রি এবং জেনডেস্ক কিউ অ্যাক্সেস করতে টিম পাসকোড প্রবেশ করান।",
     passcodePlaceholder: "টিম পাসকোড লিখুন",
     passcodeSubmit: "কনসোল আনলক করুন",
-    passcodeInvalid: "ভুল পাসকোড। অনুগ্রহ করে সঠিক টিম পাসকোড দিন।",
+    passcodeInvalid: "ভুল পাসকোড বা সার্ভার সংযোগ ব্যর্থ। সঠিক পাসকোড দিন অথবা ডেমো প্রিভিউ ব্যবহার করুন।",
+    demoPreviewBtn: "ডেমো প্রিভিউ মোড খুলুন (পোর্টফোলিও)",
+    demoPreviewBadge: "ডেমো প্রিভিউ (রিড-অনলি)",
+    demoPreviewDesc: "অ্যাডমিন পাসকোড ছাড়াই পোর্টফোলিও টেলিমেট্রি ও স্যাম্পল রেকর্ড দেখুন।",
+    logoutConsole: "কনসোল ছাড়ুন",
+    pagePrev: "পূর্ববর্তী",
+    pageNext: "পরবর্তী",
     kbManager: "নলেজ বেস"
   }
 };

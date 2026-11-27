@@ -26,10 +26,13 @@ import {
 import HandoffPackage from '@/components/HandoffPackage';
 import { Language, TRANSLATIONS, PRESET_SCENARIOS } from '@/lib/translations';
 import { DashboardStats, TicketListItem, LatestTicketResponse } from '@/types/support';
+import { isJsonResponse } from '@/lib/api';
 
 interface TeamDashboardProps {
   lang: Language;
   apiBase: string;
+  adminPasscode?: string;
+  isDemoPreview?: boolean;
   stats: DashboardStats | null;
   tickets: TicketListItem[];
   onRefresh: () => void;
@@ -38,6 +41,8 @@ interface TeamDashboardProps {
 export default function TeamDashboard({
   lang,
   apiBase,
+  adminPasscode = '',
+  isDemoPreview = false,
   stats,
   tickets,
   onRefresh,
@@ -56,6 +61,47 @@ export default function TeamDashboard({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const buildLocalPreviewSimulation = (email: string, message: string): LatestTicketResponse => {
+    const lower = message.toLowerCase();
+    const isCritical = lower.includes('refund') || lower.includes('unacceptable') || lower.includes('ক্ষতি') || lower.includes('রিফান্ড');
+    const isEnterprise = email.toLowerCase().includes('enterprise');
+    return {
+      ticket_id: 901,
+      customer_email: email,
+      customer_tier: isEnterprise ? 'enterprise' : 'standard',
+      raw_message: message,
+      status: isCritical ? 'escalated' : 'resolved',
+      category: lower.includes('ord-') ? 'Order' : isCritical ? 'Billing' : 'General',
+      intent: 'Demo Preview Simulation',
+      priority: isCritical ? 'Critical' : isEnterprise ? 'High' : 'Low',
+      sentiment: isCritical ? 'Angry' : 'Neutral',
+      churn_risk_score: isCritical ? 85 : isEnterprise ? 55 : 20,
+      processing_time_ms: 210,
+      is_verified: email !== 'visitor@techcorp.io',
+      draft_response: isCritical
+        ? undefined
+        : 'Demo Preview Response: Ticket analyzed through ZENIVIXON 6-node LangGraph architecture with grounded RAG & tenant-isolated tool context.',
+      ai_findings: 'Demo Preview Mode: Simulated LangGraph execution without active backend write.',
+      escalation_reason: isCritical
+        ? 'Fast-track Escalation: Critical/Angry inquiry routed directly to human engineering.'
+        : undefined,
+      recommended_action: isEnterprise
+        ? 'Enterprise VIP Account: Prioritize immediately, assign Lead Solutions Architect, and offer 20% SLA courtesy credit.'
+        : isCritical
+        ? 'Critical Risk: Lead with active empathy, guarantee resolution within 2 hours, and offer retention goodwill credit.'
+        : 'Standard Priority: Provide standard troubleshooting documentation and friendly confirmation.',
+      tools_executed: lower.includes('ord-')
+        ? [{ name: 'get_order', result: 'Simulated Order lookup (Demo Preview)' }]
+        : [],
+      trace: [
+        '1. Intake complete (Demo Preview)',
+        '2. Customer identity checked',
+        '3. RAG & Tenant-isolated tools evaluated',
+        isCritical ? '6. Fast-track escalated to Zendesk queue' : '4-6. Grounded draft verified & resolved',
+      ],
+    };
+  };
+
   const simulateTicket = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!simMessage.trim() || !simEmail.trim()) return;
@@ -63,25 +109,37 @@ export default function TeamDashboard({
     setLoadingSim(true);
     setSimError(null);
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (adminPasscode) {
+        headers['X-Admin-Passcode'] = adminPasscode;
+      }
       const res = await fetch(`${apiBase}/api/tickets`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           email: simEmail.trim(),
           message: simMessage.trim(),
         }),
       });
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         const data: LatestTicketResponse = await res.json();
         setLatestSimTicket(data);
-        onRefresh();
+        if (!isDemoPreview) {
+          onRefresh();
+        }
+      } else if (isDemoPreview) {
+        setLatestSimTicket(buildLocalPreviewSimulation(simEmail.trim(), simMessage.trim()));
       } else {
-        const err = await res.json().catch(() => ({}));
+        const err = isJsonResponse(res) ? await res.json().catch(() => ({})) : {};
         const detail = typeof err.detail === 'string' ? err.detail : 'Simulation failed. Check input and backend logs.';
         setSimError(detail);
       }
     } catch {
-      setSimError('Unable to reach backend API for simulation.');
+      if (isDemoPreview) {
+        setLatestSimTicket(buildLocalPreviewSimulation(simEmail.trim(), simMessage.trim()));
+      } else {
+        setSimError('Unable to reach backend API for simulation.');
+      }
     } finally {
       setLoadingSim(false);
     }

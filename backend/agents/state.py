@@ -16,6 +16,7 @@ class TicketState(TypedDict):
     customer_id: Optional[int]
     customer_tier: Optional[str]
     is_verified: bool
+    trusted_session: Optional[bool]
     
     # Tools/RAG Context
     rag_docs: Sequence[str]
@@ -24,6 +25,7 @@ class TicketState(TypedDict):
     # Resolution/Escalation
     draft_response: Optional[str]
     ai_findings: Optional[str]
+    needs_human_review: Optional[bool]
     is_safe: bool
     resolution_status: str # 'open', 'resolved', 'escalated'
     escalation_reason: Optional[str]

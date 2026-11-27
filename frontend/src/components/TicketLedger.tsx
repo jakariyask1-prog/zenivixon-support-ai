@@ -8,7 +8,9 @@ import {
   ShieldAlert,
   CheckCircle2,
   AlertTriangle,
-  Clock
+  Clock,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/translations';
 import { TicketListItem } from '@/types/support';
@@ -16,14 +18,32 @@ import { TicketListItem } from '@/types/support';
 interface TicketLedgerProps {
   lang: Language;
   tickets: TicketListItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  statusFilter: string;
+  categoryFilter: string;
+  onStatusFilterChange: (val: string) => void;
+  onCategoryFilterChange: (val: string) => void;
+  onPageChange: (newPage: number) => void;
   onInspectTicket: (id: number) => void;
 }
 
-export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketLedgerProps) {
+export default function TicketLedger({
+  lang,
+  tickets,
+  totalCount,
+  page,
+  pageSize,
+  statusFilter,
+  categoryFilter,
+  onStatusFilterChange,
+  onCategoryFilterChange,
+  onPageChange,
+  onInspectTicket,
+}: TicketLedgerProps) {
   const t = TRANSLATIONS[lang];
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
 
   const filteredTickets = tickets.filter(item => {
     const matchesSearch =
@@ -35,6 +55,10 @@ export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketL
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const startIdx = totalCount === 0 ? 0 : page * pageSize + 1;
+  const endIdx = Math.min(totalCount, (page + 1) * pageSize);
+
   return (
     <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-slate-900/60 backdrop-blur-xl shadow-xl">
       <div className="p-6 border-b border-white/[0.08] space-y-4">
@@ -42,7 +66,7 @@ export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketL
           <div>
             <h3 className="font-extrabold text-base text-white">{t.ledgerTitle}</h3>
             <p className="text-xs text-slate-400">
-              {t.ledgerDesc} ({tickets.length})
+              {t.ledgerDesc} ({totalCount})
             </p>
           </div>
         </div>
@@ -63,7 +87,7 @@ export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketL
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={e => onStatusFilterChange(e.target.value)}
               className="flex-1 px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
             >
               <option value="all">{t.filterAllStatus}</option>
@@ -76,7 +100,7 @@ export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketL
           <div>
             <select
               value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
+              onChange={e => onCategoryFilterChange(e.target.value)}
               className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500 shadow-inner"
             >
               <option value="all">{t.filterAllCats}</option>
@@ -209,6 +233,38 @@ export default function TicketLedger({ lang, tickets, onInspectTicket }: TicketL
           </table>
         </div>
       )}
+
+      {totalCount > 0 && (
+        <div className="px-6 py-4 border-t border-white/[0.08] bg-slate-950/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <span className="font-mono">
+            {startIdx}&ndash;{endIdx} / {totalCount}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 0}
+              onClick={() => onPageChange(page - 1)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 disabled:opacity-40 transition-all font-bold"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>{t.pagePrev}</span>
+            </button>
+            <span className="px-2 font-mono text-[11px]">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page + 1 >= totalPages}
+              onClick={() => onPageChange(page + 1)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 disabled:opacity-40 transition-all font-bold"
+            >
+              <span>{t.pageNext}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -1,25 +1,29 @@
 "use client";
 
 import React from 'react';
-import { Layers, Globe, HelpCircle, Lock, Unlock } from 'lucide-react';
+import { Layers, Globe, HelpCircle, Lock, Unlock, Eye, LogOut } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/translations';
 
 interface HeaderProps {
   lang: Language;
   viewMode: 'customer' | 'team';
   isTeamAuthenticated: boolean;
+  isDemoPreview?: boolean;
   onLanguageChange: (lang: Language) => void;
   onSelectCustomer: () => void;
   onSelectTeam: () => void;
+  onLogoutTeam?: () => void;
 }
 
 export default function Header({
   lang,
   viewMode,
   isTeamAuthenticated,
+  isDemoPreview = false,
   onLanguageChange,
   onSelectCustomer,
   onSelectTeam,
+  onLogoutTeam,
 }: HeaderProps) {
   const t = TRANSLATIONS[lang];
 
@@ -103,14 +107,28 @@ export default function Header({
             >
               {isTeamAuthenticated ? (
                 <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+              ) : isDemoPreview ? (
+                <Eye className="w-3.5 h-3.5 text-cyan-400" />
               ) : (
                 <Lock className="w-3.5 h-3.5 text-amber-400" />
               )}
               <span>{t.teamConsole}</span>
             </button>
           </div>
+
+          {(isTeamAuthenticated || isDemoPreview) && onLogoutTeam && (
+            <button
+              type="button"
+              onClick={onLogoutTeam}
+              title={t.logoutConsole}
+              className="p-2 rounded-xl bg-slate-900/90 hover:bg-rose-500/15 text-slate-400 hover:text-rose-300 border border-white/10 hover:border-rose-500/30 transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </header>
   );
 }
+

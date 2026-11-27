@@ -169,14 +169,27 @@ def run_evaluation():
         )
 
     avg_ms = sum(latencies_ms) / len(latencies_ms)
+    cat_acc = cat_hits / total
+    status_acc = status_hits / total
+    tool_acc = (tool_hits / tool_checks) if tool_checks else 1.0
+
     print("-" * 72)
-    print(f"  Category Accuracy   : {cat_hits}/{total} ({cat_hits / total * 100:.1f}%)")
-    print(f"  Routing Accuracy    : {status_hits}/{total} ({status_hits / total * 100:.1f}%)")
-    print(f"  Tool Guard Accuracy : {tool_hits}/{tool_checks} ({tool_hits / tool_checks * 100:.1f}%)")
+    print(f"  Category Accuracy   : {cat_hits}/{total} ({cat_acc * 100:.1f}%)")
+    print(f"  Routing Accuracy    : {status_hits}/{total} ({status_acc * 100:.1f}%)")
+    print(f"  Tool Guard Accuracy : {tool_hits}/{tool_checks} ({tool_acc * 100:.1f}%)")
     print(f"  VIP Tier Detection  : {vip_hits}/{vip_checks} ({vip_hits / vip_checks * 100:.1f}%)")
     print(f"  Average Latency     : {avg_ms:.1f} ms")
     print("=" * 72 + "\n")
 
+    min_threshold = 0.90
+    if cat_acc < min_threshold or status_acc < min_threshold or tool_acc < min_threshold:
+        print(
+            f"[FAIL] Evaluation benchmark fell below {min_threshold * 100:.0f}% quality gate "
+            f"(cat={cat_acc:.2f}, routing={status_acc:.2f}, tools={tool_acc:.2f})."
+        )
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     run_evaluation()
+

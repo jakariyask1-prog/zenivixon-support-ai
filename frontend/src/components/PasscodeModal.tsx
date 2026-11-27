@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Lock, X, AlertCircle } from 'lucide-react';
+import { Lock, X, AlertCircle, Eye } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/translations';
 
 interface PasscodeModalProps {
@@ -11,6 +11,7 @@ interface PasscodeModalProps {
   passcodeError: boolean;
   onPasscodeChange: (val: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onEnterDemoPreview: () => void;
   onClose: () => void;
 }
 
@@ -21,6 +22,7 @@ export default function PasscodeModal({
   passcodeError,
   onPasscodeChange,
   onSubmit,
+  onEnterDemoPreview,
   onClose,
 }: PasscodeModalProps) {
   if (!isOpen) return null;
@@ -60,12 +62,12 @@ export default function PasscodeModal({
             />
             {passcodeError && (
               <p className="text-xs text-rose-400 mt-2 flex items-center gap-1 font-medium">
-                <AlertCircle className="w-3.5 h-3.5" /> {t.passcodeInvalid}
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {t.passcodeInvalid}
               </p>
             )}
           </div>
 
-          <div className="flex justify-end gap-2.5 pt-2">
+          <div className="flex justify-end gap-2.5 pt-1">
             <button
               type="button"
               onClick={onClose}
@@ -81,7 +83,20 @@ export default function PasscodeModal({
             </button>
           </div>
         </form>
+
+        <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+          <p className="text-[11px] text-slate-400 text-center">{t.demoPreviewDesc}</p>
+          <button
+            type="button"
+            onClick={onEnterDemoPreview}
+            className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 transition-all flex items-center justify-center gap-2"
+          >
+            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+            <span>{t.demoPreviewBtn}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+

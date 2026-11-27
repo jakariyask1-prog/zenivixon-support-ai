@@ -11,6 +11,7 @@ interface TicketInspectorModalProps {
   ticketDetail: TicketDetailModalData | null;
   loadingDetail: boolean;
   updatingStatus: boolean;
+  isDemoPreview?: boolean;
   onClose: () => void;
   onUpdateStatus: (id: number, status: string) => void;
 }
@@ -21,6 +22,7 @@ export default function TicketInspectorModal({
   ticketDetail,
   loadingDetail,
   updatingStatus,
+  isDemoPreview = false,
   onClose,
   onUpdateStatus,
 }: TicketInspectorModalProps) {
@@ -158,12 +160,14 @@ export default function TicketInspectorModal({
 
         {ticketDetail && (
           <div className="p-5 border-t border-white/[0.08] flex justify-between items-center bg-slate-950 sticky bottom-0">
-            <span className="text-xs text-slate-400">{t.quickChangeStatus}</span>
+            <span className="text-xs text-slate-400">
+              {isDemoPreview ? 'Read-Only Demo Preview' : t.quickChangeStatus}
+            </span>
             <div className="flex gap-2.5">
               <button
                 type="button"
                 onClick={() => onUpdateStatus(ticketDetail.id, 'resolved')}
-                disabled={updatingStatus || ticketDetail.status === 'resolved'}
+                disabled={isDemoPreview || updatingStatus || ticketDetail.status === 'resolved'}
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/20"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Mark Resolved
@@ -171,7 +175,7 @@ export default function TicketInspectorModal({
               <button
                 type="button"
                 onClick={() => onUpdateStatus(ticketDetail.id, 'escalated')}
-                disabled={updatingStatus || ticketDetail.status === 'escalated'}
+                disabled={isDemoPreview || updatingStatus || ticketDetail.status === 'escalated'}
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-md shadow-rose-600/20"
               >
                 <AlertTriangle className="w-3.5 h-3.5" /> Escalate to Human

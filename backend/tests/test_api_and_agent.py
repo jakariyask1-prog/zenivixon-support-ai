@@ -242,3 +242,119 @@ def test_safety_gate_and_fast_track_rules():
     })
     assert score >= 90
     assert "Enterprise" in rec
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Master Plan Security, Persistence & Bilingual NLU Regressions
+# ─────────────────────────────────────────────────────────────────────────────
+def test_production_fails_closed_when_admin_passcodes_unset_and_case_sensitive(client, monkeypatch):
+    # Case mismatch must fail
+    res_case = client.get("/api/dashboard/stats", headers={"X-Admin-Passcode": "TEST-ADMIN-SECRET"})
+    assert res_case.status_code == 401
+
+    # Production without ADMIN_PASSCODES must fail closed (never allow dev defaults)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ADMIN_PASSCODES", "")
+    assert client.get("/api/dashboard/stats", headers={"X-Admin-Passcode": "zenivixon-2026"}).status_code == 401
+
+
+def test_admin_auth_brute_force_rate_limit(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_AUTH_MAX_FAILS_PER_MINUTE", "3")
+    main_module._admin_fail_buckets.clear()
+    try:
+        for _ in range(3):
+            r = client.get("/api/kb", headers={"X-Admin-Passcode": "wrong-attempt"})
+            assert r.status_code == 401
+        blocked = client.get("/api/kb", headers={"X-Admin-Passcode": "wrong-attempt"})
+        assert blocked.status_code == 429
+    finally:
+        main_module._admin_fail_buckets.clear()
+
+
+def test_public_email_impersonation_blocked_without_order_or_invoice_id(client):
+    # Public submission knowing only john@example.com WITHOUT ORD-/INV- must NOT execute account-wide tools
+    # and must escalate safely with public draft_response suppressed
+    pub_res = client.post("/api/tickets", json={
+        "email": "john@example.com",
+        "message": "Tell me about my latest order, billing invoices, and subscription plan."
+    })
+    assert pub_res.status_code == 200
+    pub_body = pub_res.json()
+    assert pub_body["tools_executed"] == []
+    assert pub_body["status"] == "escalated"
+    assert pub_body["draft_response"] is None
+
+    # Public tracking also keeps escalated draft_response hidden
+    track_res = client.get(f"/api/portal/track?ticket_id={pub_body['ticket_id']}&email=john@example.com")
+    assert track_res.status_code == 200
+    assert track_res.json()["draft_response"] is None
+
+    # Authenticated Admin Simulator WITH X-Admin-Passcode CAN run trusted account-wide tool simulation
+    sim_res = client.post(
+        "/api/tickets",
+        json={
+            "email": "john@example.com",
+            "message": "Can I upgrade my subscription plan next month?"
+        },
+        headers=ADMIN_HEADERS,
+    )
+    assert sim_res.status_code == 200
+    sim_body = sim_res.json()
+    assert len(sim_body["tools_executed"]) >= 1
+    assert sim_body["status"] == "resolved"
+
+
+def test_kb_articles_persist_in_relational_database(client):
+    from db.database import SessionLocal
+    from db.models import KBArticle
+
+    unique_title = "Persistent Architecture Verification Guide"
+    res = client.post(
+        "/api/kb",
+        json={
+            "title": unique_title,
+            "category": "Technical",
+            "text": "Custom KB entries are persisted in the relational kb_articles table across process restarts."
+        },
+        headers=ADMIN_HEADERS,
+    )
+    assert res.status_code == 201
+    created_id = res.json()["id"]
+
+    with SessionLocal() as db:
+        row = db.query(KBArticle).filter(KBArticle.id == created_id).first()
+        assert row is not None
+        assert row.title == unique_title
+
+
+def test_bengali_word_boundaries_categories_and_bilingual_safety_gate():
+    from agents.nodes import _heuristic_classify
+
+    # "নিবন্ধন" contains substring "বন্ধ", but must NOT false-trigger Critical priority
+    reg_cls = _heuristic_classify("নতুন ইউজার হিসেবে নিবন্ধন করার নিয়ম জানতে চাই")
+    assert reg_cls["priority"] != "Critical"
+
+    # "submit" contains "sub", "partnership" contains "ship" — must NOT false-trigger Subscription/Order
+    gen_cls = _heuristic_classify("How do I submit a partnership inquiry?")
+    assert gen_cls["category"] == "General"
+
+    # Dedicated Refund & Security category classification
+    assert _heuristic_classify("I want a money back refund")["category"] == "Refund"
+    assert _heuristic_classify("My account was hacked in a security breach")["category"] == "Security"
+
+    # Pure Bengali offline KB search bridges to ZENIVIXON English KB chunks
+    bn_hits = _search_local_fallback("আপনাদের কোম্পানির এআই সার্ভিস ও সফটওয়্যার সমাধান সম্পর্কে বলুন", limit=3)
+    assert len(bn_hits) >= 1
+
+    # Bengali escalation draft is caught by safety_gate_node
+    bn_gate = safety_gate_node({
+        "priority": "Medium",
+        "sentiment": "Neutral",
+        "customer_tier": "standard",
+        "category": "General",
+        "is_verified": True,
+        "draft_response": "আমি এটি স্বয়ংক্রিয়ভাবে সমাধান করতে পারছি না। সাপোর্ট স্পেশালিস্টকে বিষয়টি জানানো হয়েছে।",
+        "raw_message": "কাস্টম এন্টারপ্রাইজ সিস্টেম লাগবে",
+    })
+    assert bn_gate["is_safe"] is False
+

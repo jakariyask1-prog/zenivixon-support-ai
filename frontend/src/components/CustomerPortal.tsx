@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/translations';
 import { LatestTicketResponse, TicketDetailModalData, StreamNodeEvent } from '@/types/support';
+import { isEventStreamResponse, isJsonResponse } from '@/lib/api';
 
 interface CustomerPortalProps {
   lang: Language;
@@ -75,7 +76,7 @@ export default function CustomerPortal({ lang, apiBase, onTicketSubmitted }: Cus
       });
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
+        const errJson = isJsonResponse(res) ? await res.json().catch(() => ({})) : {};
         setSubmitError(
           extractApiError(
             errJson,
@@ -83,6 +84,15 @@ export default function CustomerPortal({ lang, apiBase, onTicketSubmitted }: Cus
               ? 'টিকেট জমা দেওয়া সম্ভব হয়নি। অনুগ্রহ করে ইমেইল ও মেসেজ যাচাই করে আবার চেষ্টা করুন।'
               : 'Unable to submit ticket. Please verify your email and message and try again.'
           )
+        );
+        return;
+      }
+
+      if (!isEventStreamResponse(res)) {
+        setSubmitError(
+          lang === 'bn'
+            ? 'লাইভ ব্যাকএন্ড API সংযুক্ত নেই (NEXT_PUBLIC_API_URL কনফিগার করুন অথবা টিম কনসোলের ডেমো প্রিভিউ দেখুন)।'
+            : 'Live Backend API is not connected to this static host. Configure NEXT_PUBLIC_API_URL or explore Team Console Demo Preview.'
         );
         return;
       }
@@ -166,11 +176,17 @@ export default function CustomerPortal({ lang, apiBase, onTicketSubmitted }: Cus
       const res = await fetch(
         `${apiBase}/api/portal/track?ticket_id=${cleanId}&email=${encodeURIComponent(trackEmail.trim())}`
       );
-      if (res.ok) {
+      if (res.ok && isJsonResponse(res)) {
         const data: TicketDetailModalData = await res.json();
         setTrackResult(data);
+      } else if (res.ok && !isJsonResponse(res)) {
+        setTrackError(
+          lang === 'bn'
+            ? 'লাইভ ব্যাকএন্ড API সংযুক্ত নেই (NEXT_PUBLIC_API_URL কনফিগার করুন)।'
+            : 'Live Backend API is not connected to this static host (configure NEXT_PUBLIC_API_URL).'
+        );
       } else {
-        const errJson = await res.json().catch(() => ({}));
+        const errJson = isJsonResponse(res) ? await res.json().catch(() => ({})) : {};
         setTrackError(
           extractApiError(
             errJson,

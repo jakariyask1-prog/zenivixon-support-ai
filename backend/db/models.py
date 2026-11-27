@@ -86,3 +86,16 @@ class Ticket(Base):
     resolved_at = Column(DateTime, nullable=True)
 
     customer = relationship("Customer", back_populates="tickets")
+
+
+class KBArticle(Base):
+    __tablename__ = "kb_articles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False, index=True)
+    category = Column(String, default="General", index=True)
+    text = Column(Text, nullable=False)
+    source = Column(String, default="master-kb")
+    synced_to_qdrant = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+

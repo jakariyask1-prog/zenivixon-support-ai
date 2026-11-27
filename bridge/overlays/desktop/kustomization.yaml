@@ -9,5 +9,3 @@ patches:
     - path: postgres-service.yaml
     - path: qdrant-qdrant-data-persistentVolumeClaim.yaml
     - path: qdrant-service.yaml
-    - path: redis-redis-data-persistentVolumeClaim.yaml
-    - path: redis-service.yaml
