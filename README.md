@@ -101,8 +101,8 @@ DATABASE_URL="postgresql://zenivixon:changeme@localhost:5432/zenivixon_db"
 QDRANT_URL="http://localhost:6333"
 GEMINI_API_KEY="your_gemini_api_key_here"
 GEMINI_MODEL="gemini-2.5-flash"
-ADMIN_PASSCODES="zenivixon-admin-2026"
-ALLOWED_ORIGINS="http://localhost:3000,http://localhost:8000"
+ADMIN_PASSCODES="zenivixon-2026"
+ALLOWED_ORIGINS="*"
 RATE_LIMIT_PER_MINUTE="30"
 ```
 

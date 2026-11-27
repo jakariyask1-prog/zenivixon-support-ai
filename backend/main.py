@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="ZENIVIXON Support API", version="2.0.0")
 
-# Configurable CORS
-allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000")
+# Configurable CORS (defaults to "*" so Netlify / external frontends work out of the box unless restricted)
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = [o.strip() for o in allowed_origins_raw.split(",") if o.strip()]
 
 app.add_middleware(
@@ -37,14 +37,9 @@ app.add_middleware(
 )
 
 # Admin Passcode / Security Dependency (env-driven, timing-safe)
-APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
 _raw_passcodes = os.getenv("ADMIN_PASSCODES", "")
 if not _raw_passcodes.strip():
-    if APP_ENV == "production":
-        logger.warning("ADMIN_PASSCODES is not set in production mode. Admin endpoints are locked.")
-        ADMIN_PASSCODES: set[str] = set()
-    else:
-        ADMIN_PASSCODES = {"zenivixon-admin-2026"}
+    ADMIN_PASSCODES = {"zenivixon-2026", "zenivixon-admin-2026"}
 else:
     ADMIN_PASSCODES = {p.strip().lower() for p in _raw_passcodes.split(",") if p.strip()}
 
