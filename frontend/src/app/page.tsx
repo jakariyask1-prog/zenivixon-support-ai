@@ -20,6 +20,7 @@ import {
 } from '@/lib/api';
 
 const TICKET_PAGE_SIZE = 20;
+const STATIC_TEAM_CONSOLE_PASSCODE = 'zenivixon-2026';
 
 export default function App() {
   const [apiBase, setApiBase] = useState<string>(() => process.env.NEXT_PUBLIC_API_URL?.trim() || '');
@@ -256,12 +257,26 @@ export default function App() {
         }
         setShowPasscodeModal(false);
         setViewMode('team');
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
+        // A real backend explicitly rejected the passcode
+        setPasscodeError(true);
+      } else if (!unlockStaticTeamConsole(cleanPass)) {
         setPasscodeError(true);
       }
     } catch {
-      setPasscodeError(true);
+      // Backend unreachable (e.g. static Netlify deploy without API)
+      if (!unlockStaticTeamConsole(cleanPass)) {
+        setPasscodeError(true);
+      }
     }
+  };
+
+  // NOTE: Client-side passcode for static (backend-less) deploys only.
+  // This is visible in the JS bundle and is NOT a security boundary.
+  const unlockStaticTeamConsole = (cleanPass: string): boolean => {
+    if (cleanPass !== STATIC_TEAM_CONSOLE_PASSCODE) return false;
+    handleEnterDemoPreview();
+    return true;
   };
 
   const openTicketDetail = async (id: number) => {
