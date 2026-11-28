@@ -239,45 +239,51 @@ export default function App() {
       setPasscodeError(true);
       return;
     }
+    const isStaticPass = isStaticTeamConsolePasscode(cleanPass);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(`${apiBase}/api/dashboard/stats`, {
-        headers: { 'X-Admin-Passcode': cleanPass },
+        headers: { 'X-Admin-Passcode': isStaticPass ? STATIC_TEAM_CONSOLE_PASSCODE : cleanPass },
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       if (res.ok && isJsonResponse(res)) {
+        const authPass = isStaticPass ? STATIC_TEAM_CONSOLE_PASSCODE : cleanPass;
         const data: DashboardStats = await res.json();
         setStats(data);
         setIsDemoPreview(false);
         setIsTeamAuthenticated(true);
-        setAdminPasscode(cleanPass);
+        setAdminPasscode(authPass);
         setTicketPage(0);
         try {
-          sessionStorage.setItem('zenivixon_admin_passcode', cleanPass);
+          sessionStorage.setItem('zenivixon_admin_passcode', authPass);
         } catch {
           // ignore
         }
         setShowPasscodeModal(false);
         setViewMode('team');
-      } else if (res.status === 401 || res.status === 403) {
-        // A real backend explicitly rejected the passcode
-        setPasscodeError(true);
-      } else if (!unlockStaticTeamConsole(cleanPass)) {
-        setPasscodeError(true);
+        return;
       }
     } catch {
-      // Backend unreachable (e.g. static Netlify deploy without API)
-      if (!unlockStaticTeamConsole(cleanPass)) {
-        setPasscodeError(true);
-      }
+      // Backend unreachable / timed out (e.g. static Netlify deploy without API)
+    }
+    if (isStaticPass) {
+      // No backend accepted it, but this is the static Team Console passcode → open with preview data
+      handleEnterDemoPreview();
+    } else {
+      setPasscodeError(true);
     }
   };
 
   // NOTE: Client-side passcode for static (backend-less) deploys only.
   // This is visible in the JS bundle and is NOT a security boundary.
-  const unlockStaticTeamConsole = (cleanPass: string): boolean => {
-    if (cleanPass !== STATIC_TEAM_CONSOLE_PASSCODE) return false;
-    handleEnterDemoPreview();
-    return true;
-  };
+  // Tolerant of case, spaces and mobile-keyboard dash variants (– — −).
+  const isStaticTeamConsolePasscode = (raw: string): boolean =>
+    raw
+      .toLowerCase()
+      .replace(/[\u2010-\u2015\u2212]/g, '-')
+      .replace(/\s+/g, '') === STATIC_TEAM_CONSOLE_PASSCODE;
 
   const openTicketDetail = async (id: number) => {
     if (isDemoPreview) {
